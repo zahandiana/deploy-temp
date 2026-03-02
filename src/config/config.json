@@ -1,0 +1,15 @@
+{
+  "db_path": "ANCPI.db",
+  "denumire_unitate": "",
+  "cui": "",
+  "adresa": "",
+  "cont_bancar": "",
+  "banca": "",
+  "conducator_nume": "",
+  "conducator_functie": "",
+  "responsabil_hr_nume": "",
+  "responsabil_hr_functie": "",
+  "app_user": "",
+  "app_pass": "",
+  "custom_fields": {}
+}

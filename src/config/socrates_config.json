@@ -1,0 +1,20 @@
+{
+  "db_path": "ANCPI.db",
+  "denumire_unitate": "AGENTIA NATIONALA DE CADASTRU SI PUBLICITATE IMOBILIARA",
+  "cui": "9051601",
+  "adresa": "SPLAIUL INDEPENDENTEI Nr. 202A",
+  "cont_bancar": "RO84TREZ23G510103100202X",
+  "banca": "TREZORERIA STATULUI",
+  "conducator_nume": "Laurențiu-Alexandru BLAGA",
+  "conducator_functie": "Director General Agenția Națională de Cadastru și Publicitate Imobiliară AgendaCV",
+  "responsabil_hr_nume": "Viviana VLĂDUȚU",
+  "responsabil_hr_functie": "DIRECTOR",
+  "app_user": "",
+  "app_pass": "",
+  "custom_fields": {},
+  "telefon": "",
+  "fax": "",
+  "email": "",
+  "afiseaza_iban_in_antet": false,
+  "semnare_metoda": "Nesemnate"
+}
