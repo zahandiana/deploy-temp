@@ -26,6 +26,492 @@ import tempfile
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# CSS global pentru a forța dark mode și controale consistente, indiferent de tema OS/browser.
+FORCE_DARK_CSS = """
+<style>
+/* A) Force dark controls, indiferent de OS */
+:root { color-scheme: dark !important; }
+html, body { background: #070B12 !important; color: #E5E7EB !important; }
+
+/* B) Overlay global dezactivat – tema globală se ocupă de contrast */
+
+/* C) Container-e Streamlit */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+[data-testid="stSidebar"] {
+  background: transparent !important;
+
+/* D) TextInput/PasswordInput: vopsește WRAPPER-ul BaseWeb (nu doar input-ul) */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div,
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div > div,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div > div {
+  background-color: #0F172A !important;
+  border: 1px solid #263244 !important;
+  box-shadow: none !important;
+}
+
+/* input efectiv */
+div[data-testid="stTextInput"] input {
+  background-color: #0F172A !important;
+  color: #E5E7EB !important;
+}
+
+/* label + help */
+div[data-testid="stTextInput"] label,
+div[data-testid="stTextInput"] p {
+  color: #E5E7EB !important;
+}
+
+/* placeholder */
+div[data-testid="stTextInput"] input::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* icon / buton eye (password) să nu fie alb */
+div[data-testid="stTextInput"] [data-baseweb="icon"],
+div[data-testid="stTextInput"] button,
+div[data-testid="stTextInput"] [role="button"] {
+  background-color: #0F172A !important;
+  color: #E5E7EB !important;
+}
+
+/* H) Fix pentru "eye" (password reveal) - endEnhancer BaseWeb */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div > div:last-child,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div > div:last-child {
+  background-color: #0F172A !important;
+  border-left: 1px solid #263244 !important;
+}
+
+/* Butonul din endEnhancer (ochiul) */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div > div:last-child button,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div > div:last-child button {
+  background-color: #0F172A !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Icon-ul să fie vizibil pe fundal închis */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div > div:last-child svg,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div > div:last-child svg {
+  color: #E5E7EB !important;
+  fill: #E5E7EB !important;
+}
+
+/* Dacă BaseWeb mai pune background pe elemente interne */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div > div:last-child *,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div > div:last-child * {
+  background-color: #0F172A !important;
+}
+
+/* --- FIX "cursiv" pentru password eye (BaseWeb endEnhancer) --- */
+
+/* 1) Wrapper-ul principal al input-ului: el devine "capsula" unică */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div {
+  background: #0F172A !important;
+  border: 1px solid #263244 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;      /* cheie: face eye-ul să fie tăiat după radius */
+  box-shadow: none !important;
+}
+
+/* 2) Input-ul efectiv: transparent ca să se vadă background-ul wrapper-ului */
+div[data-testid="stTextInput"] input {
+  background: transparent !important;
+  color: #E5E7EB !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 3) End enhancer container (zona eye): forțat transparent ca să nu bage alb */
+div[data-testid="stTextInput"] [data-baseweb="end-enhancer"],
+div[data-testid="stTextInput"] [data-baseweb="endEnhancer"],
+div[data-testid="stTextInput"] [data-baseweb="end-enhancer"] *,
+div[data-testid="stTextInput"] [data-baseweb="endEnhancer"] * {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 4) Butonul eye: complet transparent + fără borduri */
+div[data-testid="stTextInput"] button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 5) Icon-ul eye vizibil pe dark */
+div[data-testid="stTextInput"] button svg,
+div[data-testid="stTextInput"] [data-baseweb="icon"] svg {
+  color: #E5E7EB !important;
+  fill: #E5E7EB !important;
+}
+
+/* 6) Focus pe întreg wrapper-ul (nu ring alb pe bucăți) */
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div:focus-within,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div:focus-within {
+  border-color: #334155 !important;
+  box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.35) !important;
+}
+
+/* Ciocan final: dacă BaseWeb pune inline background alb pe eye */
+div[data-testid="stTextInput"] [data-baseweb="end-enhancer"] [style*="background"],
+div[data-testid="stTextInput"] [data-baseweb="endEnhancer"] [style*="background"] {
+  background: transparent !important;
+}
+
+/* ====== LOGIN INPUTS: target după aria-label (robust) ====== */
+
+/* Paletă (schimbăm culoarea ca să fie clar premium și uniform) */
+:root{
+  --login-bg: #0B1220;        /* mai închis, “premium” */
+  --login-border: #2B3A55;    /* bordură calmă */
+  --login-border-focus: #3B4B6A;
+  --login-text: #E5E7EB;
+  --login-muted: #9CA3AF;
+}
+
+/* 1) Control unitar (capsulă) pentru UTILIZATOR și PAROLĂ */
+div[data-testid="stTextInput"]:has(input[aria-label="Utilizator"]) div[data-baseweb="input"] > div,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"])     div[data-baseweb="input"] > div{
+  background: var(--login-bg) !important;
+  border: 1px solid var(--login-border) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;              /* cheie: eye nu mai “sparge” capsula */
+  box-shadow: none !important;
+}
+
+/* 2) Tot ce e în interior devine transparent ca să se vadă doar background-ul capsulei */
+div[data-testid="stTextInput"]:has(input[aria-label="Utilizator"]) div[data-baseweb="input"] * ,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"])     div[data-baseweb="input"] * {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 3) Input-ul efectiv */
+div[data-testid="stTextInput"]:has(input[aria-label="Utilizator"]) input,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"])     input{
+  background: transparent !important;
+  color: var(--login-text) !important;
+  border: 0 !important;
+  outline: none !important;
+}
+
+/* placeholder */
+div[data-testid="stTextInput"]:has(input[aria-label="Utilizator"]) input::placeholder,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"])     input::placeholder{
+  color: var(--login-muted) !important;
+}
+
+/* 4) Eye button: forțat să fie parte din capsulă (fără alb) */
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"]) button,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"]) [role="button"]{
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+/* Icon eye vizibil */
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"]) svg{
+  color: var(--login-text) !important;
+  fill: var(--login-text) !important;
+  opacity: 0.9 !important;
+}
+
+/* 5) Focus pe capsulă (nu ring alb pe bucăți) */
+div[data-testid="stTextInput"]:has(input[aria-label="Utilizator"]) div[data-baseweb="input"] > div:focus-within,
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"])     div[data-baseweb="input"] > div:focus-within{
+  border-color: var(--login-border-focus) !important;
+  box-shadow: 0 0 0 2px rgba(59, 75, 106, 0.35) !important;
+}
+
+/* Dacă totuși BaseWeb forțează stiluri albe pe endEnhancer, ultima soluție:
+   ascundem complet eye-ul ca să păstrăm controlul curat și uniform. */
+div[data-testid="stTextInput"] [data-baseweb="end-enhancer"],
+div[data-testid="stTextInput"] [data-baseweb="endEnhancer"]{
+  display: none !important;
+}
+
+/* focus fără ring alb */
+div[data-testid="stTextInput"] input:focus {
+  outline: none !important;
+}
+div[data-testid="stTextInput"] div[data-baseweb="input"] > div:focus-within,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div:focus-within {
+  border-color: #334155 !important;
+  box-shadow: 0 0 0 2px rgba(51, 65, 85, 0.35) !important;
+}
+
+/* E) Chrome autofill (alb/galben) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #E5E7EB !important;
+  box-shadow: 0 0 0px 1000px #0F172A inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* F) Butoane coerente */
+.stButton button {
+  background-color: #0F172A !important;
+  color: #E5E7EB !important;
+  border: 1px solid #263244 !important;
+}
+
+/* G) Dacă există “glass” (blur/transparență), forțează-l să fie aproape opac */
+.glass, .glass-card, .glass-panel, .login-card {
+  background: rgba(15,23,42,0.92) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(38,50,68,1) !important;
+}
+
+/* Ultimate override pentru zona albă de la eye: tot ce este în controlul parolei
+   și are background inline devine aceeași culoare ca input-ul. */
+div[data-testid="stTextInput"]:has(input[aria-label="Parolă"]) *[style*="background"] {
+  background-color: var(--login-bg) !important;
+  border-color: var(--login-bg) !important;
+  box-shadow: none !important;
+}
+
+/* === FINAL GENERAL FIX: tratează BaseWeb base-input ca o singură capsulă pentru TOATE stTextInput === */
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] {
+  background-color: var(--login-bg) !important;
+  border: 1px solid var(--login-border) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] input,
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] button {
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] svg {
+  color: var(--login-text) !important;
+  fill: var(--login-text) !important;
+}
+
+/* Orice background inline din interiorul base-input devine transparent, ca să nu mai apară alb */
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] *[style*="background"] {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+...</style>
+"""
+
+APP_THEME_CSS = """
+<style>
+/* ============ SOCRATES DARK THEME PACK (GLOBAL) ============ */
+:root{
+  color-scheme: dark !important;          /* ignoră tema OS */
+  --bg: #070B12;
+  --surface: #0B1220;
+  --surface2: #0F172A;
+  --border: #263244;
+  --text: #F8FAFC;                        /* alb curat */
+  --muted: #E5E7EB;                       /* “gri” dar super lizibil */
+  --muted2: #CBD5E1;                      /* pentru captions/help */
+  --accent: #22C55E;
+
+  --tab-bg: #0B1220;
+  --tab-active: #0F172A;
+  --tab-border: #263244;
+}
+
+/* Background global */
+html, body { background: var(--bg) !important; color: var(--text) !important; }
+[data-testid="stAppViewContainer"] { background: var(--bg) !important; color: var(--text) !important; }
+[data-testid="stSidebar"] { background: var(--surface) !important; color: var(--text) !important; }
+
+/* Text baseline: scapă de griuri spalăcite */
+[data-testid="stMarkdownContainer"], 
+[data-testid="stMarkdownContainer"] * { color: var(--text) !important; }
+
+/* Captions și “help text” sunt prea gri by default: le facem lizibile */
+[data-testid="stCaptionContainer"] p,
+[data-testid="stCaptionContainer"] span{
+  color: var(--muted2) !important;
+  opacity: 1 !important;
+}
+
+/* Labels (Utilizator/Parolă etc.) */
+label, [data-testid="stWidgetLabel"] * {
+  color: var(--text) !important;
+  opacity: 1 !important;
+}
+
+/* Inputs / Select / Textarea: uniform dark */
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div,
+div[data-baseweb="select"] > div{
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+div[data-baseweb="input"] input,
+div[data-baseweb="textarea"] textarea{
+  background: transparent !important;
+  color: var(--text) !important;
+}
+div[data-baseweb="input"] input::placeholder,
+div[data-baseweb="textarea"] textarea::placeholder{
+  color: var(--muted2) !important;
+}
+
+/* Chrome autofill (alb/galben) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill{
+  -webkit-text-fill-color: var(--text) !important;
+  box-shadow: 0 0 0px 1000px var(--surface2) inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* Button styling consistent */
+.stButton button{
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.stButton button:hover{
+  border-color: rgba(34,197,94,0.55) !important;
+}
+
+/* Expander title text */
+div[data-testid="stExpander"] summary * {
+  color: var(--text) !important;
+}
+
+/* Metrics (label-ul e de obicei gri) */
+[data-testid="stMetricLabel"] * { color: var(--muted) !important; opacity: 1 !important; }
+[data-testid="stMetricValue"] * { color: var(--text) !important; }
+
+/* Text secundar: captions/help/markdown mic nu devine gri spălăcit */
+[data-testid="stCaptionContainer"] * ,
+small, .stMarkdown p, .stMarkdown span {
+  color: var(--muted2) !important;
+  opacity: 1 !important;
+}
+
+/* Label-uri și titluri: alb curat */
+label, [data-testid="stWidgetLabel"] * {
+  color: var(--text) !important;
+  opacity: 1 !important;
+}
+
+/* ============ TABS (st.tabs) ============ */
+/* tablist container */
+div[data-testid="stTabs"] [role="tablist"]{
+  border-bottom: 0 !important;
+  gap: 10px !important;
+}
+/* tab button default */
+div[data-testid="stTabs"] button[role="tab"]{
+  background: var(--tab-bg) !important;
+  color: var(--muted2) !important;
+  border: 1px solid var(--tab-border) !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  margin: 0 !important;
+}
+/* tab active */
+div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+  background: var(--tab-active) !important;
+  color: var(--text) !important;
+  border-color: rgba(34,197,94,0.6) !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
+}
+/* tab panel spacing */
+div[data-testid="stTabs"] [role="tabpanel"]{
+  padding-top: 12px !important;
+}
+</style>
+"""
+
+LOGIN_FORCE_INPUTS_CSS = """
+<style>
+/* ---- LOGIN: FORCE DARK INPUTS (super robust) ---- */
+:root { color-scheme: dark !important; }
+
+/* prinde orice variantă BaseWeb: input, base-input, etc */
+div[data-testid="stTextInput"] [data-baseweb*="input"],
+div[data-testid="stTextInput"] [data-baseweb*="input"] > div,
+div[data-testid="stTextInput"] [data-baseweb*="input"] > div > div {
+  background: #0B1220 !important;
+  border: 1px solid #263244 !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+}
+
+/* input efectiv */
+div[data-testid="stTextInput"] input {
+  background: #0B1220 !important;
+  color: #F8FAFC !important;
+  caret-color: #F8FAFC !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* placeholder */
+div[data-testid="stTextInput"] input::placeholder {
+  color: #CBD5E1 !important;
+  opacity: 1 !important;
+}
+
+/* autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #F8FAFC !important;
+  box-shadow: 0 0 0px 1000px #0B1220 inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* dacă există eye/end-enhancer, îl facem transparent ca să nu bage alb */
+div[data-testid="stTextInput"] [data-baseweb*="end"] ,
+div[data-testid="stTextInput"] [data-baseweb*="end"] * {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+div[data-testid="stTextInput"] button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+div[data-testid="stTextInput"] svg {
+  color: #F8FAFC !important;
+  fill: #F8FAFC !important;
+}
+</style>
+"""
+
+
+def apply_app_theme():
+    import streamlit as st
+    st.markdown(APP_THEME_CSS, unsafe_allow_html=True)
+
+
+def apply_login_fix():
+    import streamlit as st
+    st.markdown(LOGIN_FORCE_INPUTS_CSS, unsafe_allow_html=True)
+
+
+def apply_force_dark_ui() -> None:
+    st.markdown(FORCE_DARK_CSS, unsafe_allow_html=True)
+
+
 def inject_css():
     css_path = BASE_DIR / "assets" / "theme.css"
     if css_path.exists():
@@ -165,7 +651,9 @@ def _df_to_csv_bytes(df) -> bytes:
         return (str(df)).encode('utf-8')
     
 
-st.set_page_config(page_title="Socrates@HR", layout="wide")
+st.set_page_config(page_title="SOCRATES@HR", layout="wide")
+apply_app_theme()
+apply_force_dark_ui()
 inject_css()
 st.markdown('<div class="bg-glow"></div>', unsafe_allow_html=True)
 
@@ -3787,8 +4275,22 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
         st.markdown("<div class='login-title'>Autentificare</div>", unsafe_allow_html=True)
         st.markdown("<div class='login-subtitle'>Introduceți credențialele.</div>", unsafe_allow_html=True)
 
-        u = st.text_input("Utilizator", key="login_user", placeholder="ex: ioana.popescu")
-        p = st.text_input("Parolă", type="password", key="login_pass", placeholder="••••••••")
+        # Câmpuri login într-un singur bloc logic
+        def _login_field(label: str, key: str, *, is_password: bool = False, placeholder: str = "") -> str:
+            st.markdown(f"**{label}**")
+            return st.text_input(
+                label,
+                key=key,
+                type="password" if is_password else "default",
+                placeholder=placeholder,
+                label_visibility="collapsed",
+            )
+
+        u = _login_field("Utilizator", "login_user", is_password=False, placeholder="ex: ioana.popescu")
+        p = _login_field("Parolă", "login_pass", is_password=True, placeholder="••••••••")
+
+        # IMPORTANT: injectăm fix-ul de login după ce widget-urile există în DOM
+        apply_login_fix()
 
         st.markdown("<div class='primary-btn'>", unsafe_allow_html=True)
         login_clicked = st.button("Autentificare", use_container_width=True, key="login_btn")
@@ -6911,25 +7413,25 @@ def page_angajati(conn: sqlite3.Connection):
                     # UI polishing - carduri și stilizare custom pentru secțiunea vechime
                     st.markdown(
                         """
-                    <style>
-                    .s-card {
-                    background: rgba(255,255,255,0.04);
-                    border: 1px solid rgba(255,255,255,0.08);
-                    border-radius: 14px;
-                    padding: 16px 18px;
-                    margin-bottom: 14px;
-                    }
-                    .s-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
-                    .s-muted { opacity: 0.75; font-size: 13px; }
-                    .s-pill {
-                    display:inline-block; padding: 6px 10px; border-radius: 999px;
-                    background: rgba(255,255,255,0.06);
-                    border: 1px solid rgba(255,255,255,0.08);
-                    margin-right: 8px; margin-top: 6px;
-                    font-size: 13px;
-                    }
-                    </style>
-                    """,
+                        <style>
+                        .s-card {
+                          background: rgba(15,23,42,0.95);
+                          border: 1px solid var(--border, #263244);
+                          border-radius: 14px;
+                          padding: 16px 18px;
+                          margin-bottom: 14px;
+                        }
+                        .s-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+                        .s-muted { color: var(--muted2, #CBD5E1); opacity: 1; font-size: 13px; }
+                        .s-pill {
+                          display:inline-block; padding: 6px 10px; border-radius: 999px;
+                          background: var(--tab-bg, #0B1220);
+                          border: 1px solid var(--tab-border, #263244);
+                          margin-right: 8px; margin-top: 6px;
+                          font-size: 13px;
+                        }
+                        </style>
+                        """,
                         unsafe_allow_html=True,
                     )
 
@@ -11374,9 +11876,10 @@ def render_org_drag_editor(df_units, positions: dict, scale=1.0):
         position: relative;
         width: 100%;
         height: 720px;
-        border: 1px solid #ddd;
-        background: #fff;
+        border: 1px solid #263244;
+        background: rgba(11,18,32,0.92);
         overflow: auto;
+        border-radius: 14px;
       }}
       .org-svg {{
         position: absolute;
@@ -11388,15 +11891,16 @@ def render_org_drag_editor(df_units, positions: dict, scale=1.0):
       .org-node {{
         position: absolute;
         padding: 8px 10px;
-        border: 1px solid #3b82f6;
-        border-radius: 10px;
-        background: #eef6ff;
+        border: 1px solid rgba(34,197,94,0.55);
+        border-radius: 12px;
+        background: rgba(15,23,42,0.95);
+        color: #F8FAFC;
         font-family: Arial, sans-serif;
         font-size: 12px;
         cursor: grab;
         user-select: none;
         white-space: nowrap;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        box-shadow: none;
       }}
     </style>
 
@@ -14345,7 +14849,7 @@ def main():
     def _on_adm_change():
         st.session_state["main_choice"] = st.session_state["sidebar_adm_pick"]
 
-    st.sidebar.markdown("##### Operațional")
+    st.sidebar.markdown("<div class='sb-group'>Operațional</div>", unsafe_allow_html=True)
     st.sidebar.radio(
         "",
         OPS,
@@ -14355,7 +14859,7 @@ def main():
         on_change=_on_ops_change,
     )
 
-    st.sidebar.markdown("##### Administrativ")
+    st.sidebar.markdown("<div class='sb-group'>Administrativ</div>", unsafe_allow_html=True)
     st.sidebar.radio(
         "",
         ADM,
