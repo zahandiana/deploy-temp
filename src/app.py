@@ -255,12 +255,7 @@ input:-webkit-autofill:focus {
   transition: background-color 9999s ease-out 0s;
 }
 
-/* F) Butoane coerente */
-.stButton button {
-  background-color: #0F172A !important;
-  color: #E5E7EB !important;
-  border: 1px solid #263244 !important;
-}
+/* (fost F) Butoane coerente – mutat pe rail-uri specifice, nu global */
 
 /* G) Dacă există “glass” (blur/transparență), forțează-l să fie aproape opac */
 .glass, .glass-card, .glass-panel, .login-card {
@@ -472,18 +467,6 @@ div[data-testid="stNumberInputRootElement"]:focus-within,
 div[data-testid="stTextAreaRootElement"]:focus-within{
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
-}
-
-/* Buttons coerente */
-.stButton button{
-  background: var(--surface2) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
-}
-.stButton button:hover{
-  border-color: var(--accent) !important;
 }
 
 /* Tabs uniforme */
@@ -1221,17 +1204,6 @@ div[data-testid="stTextInput"] [data-baseweb*="input"] > div:focus-within{
   box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
 }
 
-/* 5) Butoane coerente (Scurtături + Caută/Curață) */
-.stButton button{
-  background: var(--surface2) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
-}
-.stButton button:hover{
-  border-color: var(--accent) !important;
-}
 </style>
 """
 
@@ -1242,6 +1214,328 @@ DEBUG_CSS = "body{outline:6px solid red !important;}"
 def apply_app_theme():
     import streamlit as st
     st.markdown(APP_THEME_CSS, unsafe_allow_html=True)
+
+
+def apply_premium_theme():
+    """Premium dashboard theming: glass cards + left rail."""
+    import streamlit as st
+    st.markdown(
+        """
+        <style>
+        /* Workspace centrat + padding */
+        .block-container{
+          max-width: 1280px !important;
+          padding-top: 1.15rem !important;
+          padding-bottom: 2rem !important;
+        }
+
+        /* Card glass reutilizabil */
+        .s-card{
+          background: rgba(7,11,18,0.70);
+          border: 1px solid rgba(148,163,184,0.18);
+          border-radius: 16px;
+          padding: 16px 18px;
+          margin-bottom: 14px;
+          backdrop-filter: blur(14px) saturate(140%);
+          -webkit-backdrop-filter: blur(14px) saturate(140%);
+        }
+        .s-card:hover{
+          background: rgba(7,11,18,0.82);
+          border-color: rgba(59,130,246,0.35);
+        }
+
+        .s-title{ font-size: 16px; font-weight: 800; margin: 0 0 10px 0; }
+        .s-muted{ opacity: .78; font-size: 12px; margin-top: 4px; }
+
+        /* Left rail buttons: full width în coloană îngustă */
+        .action-rail .stButton>button{
+          width: 100%;
+          height: 38px;
+          border-radius: 12px;
+          text-align: left;
+          padding: 0 14px;
+          background: rgba(15,23,42,0.70);
+          border: 1px solid rgba(148,163,184,0.22);
+          color: #F8FAFC;
+          box-shadow: none;
+        }
+        .action-rail .stButton>button:hover{
+          background: rgba(37,99,235,0.26);
+          border-color: rgba(59,130,246,0.40);
+        }
+        .action-rail .stButton>button:focus{
+          box-shadow: 0 0 0 2px rgba(59,130,246,0.35);
+          outline: none;
+        }
+
+        /* Search row input: colțuri mai rotunjite */
+        .search-row .stTextInput>div>div input{
+          border-radius: 12px !important;
+        }
+
+        /* --- RAIL (scurtături): coloană îngustă + butoane egale, aliniate stânga --- */
+        .rail{
+          max-width: 320px;
+        }
+
+        .rail .stButton,
+        .rail .stButton > button{
+          width: 100% !important;
+        }
+
+        .rail .stButton > button{
+          height: 42px !important;
+          border-radius: 12px !important;
+          padding: 0 14px !important;
+
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;   /* lipit stânga */
+          gap: 10px !important;
+
+          text-align: left !important;
+          background: rgba(255,255,255,0.06) !important;
+          border: 1px solid rgba(255,255,255,0.10) !important;
+          color: rgba(255,255,255,0.92) !important;
+        }
+
+        .rail .stButton > button:hover{
+          background: rgba(59,130,246,0.16) !important;
+          border-color: rgba(59,130,246,0.28) !important;
+        }
+
+        /* ===== SECTION LAYOUT + BUTTON STACK (Dashboard/Home) ===== */
+        /* BAR separator intre sectiuni (full width) */
+        .section-bar{
+          width: 100%;
+          height: 2px;
+          border-radius: 999px;
+          margin: 18px 0;
+          background: linear-gradient(90deg,
+            rgba(255,255,255,0.00),
+            rgba(255,255,255,0.14),
+            rgba(255,255,255,0.00)
+          );
+        }
+
+        /* Wrapper: toate sectiunile sunt aliniate la stanga */
+        .section-wrap{
+          display: block;
+        }
+
+        /* Titluri sectiuni */
+        .section-title{
+          font-size: 16px;
+          font-weight: 800;
+          margin: 0 0 10px 0;
+        }
+
+        /* Butoane “stacked”: narrow, identice, stanga */
+        .btnstack{
+          max-width: 320px;
+        }
+
+        .btnstack .stButton,
+        .btnstack .stButton > button{
+          width: 100% !important;
+        }
+
+        .btnstack .stButton > button{
+          height: 42px !important;
+          border-radius: 12px !important;
+          padding: 0 14px !important;
+
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important; /* stanga */
+          gap: 10px !important;
+
+          text-align: left !important;
+          background: rgba(255,255,255,0.06) !important;
+          border: 1px solid rgba(255,255,255,0.10) !important;
+          color: rgba(255,255,255,0.92) !important;
+        }
+
+        .btnstack .stButton > button:hover{
+          background: rgba(59,130,246,0.16) !important;
+          border-color: rgba(59,130,246,0.28) !important;
+        }
+
+        /* ===== EMPLOYEES: FILTER CARD (page_angajati) ===== */
+        .filter-card{
+          background: rgba(10, 18, 35, 0.45);
+          border: 1px solid rgba(255,255,255,0.10);
+          border-radius: 18px;
+          padding: 18px 18px;
+          backdrop-filter: blur(14px) saturate(140%);
+          -webkit-backdrop-filter: blur(14px) saturate(140%);
+        }
+
+        .filter-h2{ font-size: 26px; font-weight: 900; margin: 0 0 14px 0; }
+        .filter-h3{ font-size: 14px; font-weight: 800; opacity: .9; margin: 0 0 8px 0; }
+
+        .vgap-12{ margin-top: 12px; }
+        .vgap-16{ margin-top: 16px; }
+
+        .filter-card .stTextInput>div>div input{
+          border-radius: 14px !important;
+          height: 44px !important;
+        }
+
+        .filter-card .stButton>button{
+          height: 44px !important;
+          border-radius: 14px !important;
+        }
+
+        .filter-card details{
+          border-radius: 14px !important;
+          overflow: hidden;
+        }
+        .filter-card details > summary{
+          padding: 12px 14px !important;
+          border: 1px solid rgba(255,255,255,0.10) !important;
+          border-radius: 14px !important;
+          background: rgba(255,255,255,0.04) !important;
+        }
+        .filter-card details[open] > summary{
+          border-bottom-left-radius: 0 !important;
+          border-bottom-right-radius: 0 !important;
+        }
+        .filter-card details > div{
+          border: 1px solid rgba(255,255,255,0.10) !important;
+          border-top: none !important;
+          padding: 14px 14px 16px 14px !important;
+          border-bottom-left-radius: 14px !important;
+          border-bottom-right-radius: 14px !important;
+          background: rgba(255,255,255,0.03) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+SIDEBAR_BLUE = "#163A4C"  # ajustează dacă sidebar-ul are altă nuanță
+
+# Păstrăm o constantă pentru compatibilitate cu apelurile existente;
+# fundalul efectiv al Home-ului este controlat în apply_page_background.
+HOME_BG_CSS = ""
+
+
+def apply_centered_layout(max_width_px: int = 1280):
+    """Centrează conținutul (block-container) pe toate paginile."""
+    import streamlit as st
+    st.markdown(
+        f"""
+        <style>
+        section.main .block-container {{
+            max-width: {max_width_px}px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding-left: 2.2rem !important;
+            padding-right: 2.2rem !important;
+            padding-top: 1.2rem !important;
+            padding-bottom: 2.2rem !important;
+        }}
+
+        div[data-testid="stAppViewContainer"] {{
+            overflow-x: hidden;
+        }}
+
+        @media (max-width: 900px) {{
+          section.main .block-container {{
+            padding-left: 1.1rem !important;
+            padding-right: 1.1rem !important;
+          }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_page_background(page_name: str, home_bg_css: str | None = None):
+    """
+    Controlează fundalul pentru Home vs restul paginilor.
+    - Home: poate avea imagine (home_bg_css)
+    - Restul: fundal solid SIDEBAR_BLUE, fără imagine
+    """
+    import streamlit as st
+
+    if page_name == "Acasă":
+        # Fundal cu statuie.jpeg (ca înainte), doar pe Home
+        img_path = BASE_DIR / "assets" / "statuie.jpeg"
+        if not img_path.exists():
+            # fallback foarte safe
+            img_path = BASE_DIR / "assets" / "fundal.jpeg"
+
+        if img_path.exists():
+            try:
+                img_bytes = img_path.read_bytes()
+                img_b64 = b64.b64encode(img_bytes).decode("utf-8")
+                mime = mimetypes.guess_type(str(img_path))[0] or "image/png"
+                st.markdown(
+                    f"""
+                    <style>
+                    div[data-testid="stAppViewContainer"] {{
+                      background:
+                        linear-gradient(180deg, rgba(10,18,35,0.25), rgba(10,18,35,0.55)),
+                        url("data:{mime};base64,{img_b64}") center/cover no-repeat fixed !important;
+                    }}
+                    body {{
+                      background: {SIDEBAR_BLUE} !important;
+                    }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            except Exception:
+                # dacă ceva nu merge, cădem pe fundal simplu albastru
+                st.markdown(
+                    f"""
+                    <style>
+                    div[data-testid="stAppViewContainer"] {{
+                      background: {SIDEBAR_BLUE} !important;
+                    }}
+                    body {{
+                      background: {SIDEBAR_BLUE} !important;
+                    }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.markdown(
+                f"""
+                <style>
+                div[data-testid="stAppViewContainer"] {{
+                  background: {SIDEBAR_BLUE} !important;
+                }}
+                body {{
+                  background: {SIDEBAR_BLUE} !important;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.markdown(
+            f"""
+            <style>
+            div[data-testid="stAppViewContainer"] {{
+              background: {SIDEBAR_BLUE} !important;
+              background-image: none !important;
+            }}
+            body {{
+              background: {SIDEBAR_BLUE} !important;
+            }}
+            .stApp {{
+              background: transparent !important;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def apply_login_fix():
@@ -1268,45 +1562,42 @@ def inject_css(css: str | None = None):
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
-        # Background imagine (data URI) în funcție de stare login:
-        # - pe pagina de login: grecia.png
-        # - după login: statuie.jpeg (fallback fundal.jpeg dacă lipsește)
+        # Login background: doar când user-ul NU este autentificat.
+        # După login, fundalul este controlat de apply_page_background().
         try:
             logged_in = bool(st.session_state.get("logged_in", False))
         except Exception:
             logged_in = False
 
-        img_name = "statuie.jpeg" if logged_in else "grecia.png"
-        img_path = BASE_DIR / "assets" / img_name
+        if not logged_in:
+            img_path = BASE_DIR / "assets" / "grecia.png"
+            if not img_path.exists():
+                alt_path = BASE_DIR / "assets" / "fundal.jpeg"
+                if alt_path.exists():
+                    img_path = alt_path
 
-        if not img_path.exists():
-            alt_name = "fundal.jpeg" if img_name == "statuie.jpeg" else "fundal.jpeg"
-            alt_path = BASE_DIR / "assets" / alt_name
-            if alt_path.exists():
-                img_path = alt_path
-
-        if img_path.exists():
-            try:
-                img_bytes = img_path.read_bytes()
-                img_b64 = b64.b64encode(img_bytes).decode("utf-8")
-                mime = mimetypes.guess_type(str(img_path))[0] or "image/png"
-                st.markdown(
-                    f"""
-                    <style>
-                    .stApp {{
-                      background-color:#05060a;
-                      background-image: url("data:{mime};base64,{img_b64}");
-                      background-size: cover;
-                      background-position: center center;
-                      background-attachment: fixed;
-                      background-repeat: no-repeat;
-                    }}
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            except Exception:
-                pass
+            if img_path.exists():
+                try:
+                    img_bytes = img_path.read_bytes()
+                    img_b64 = b64.b64encode(img_bytes).decode("utf-8")
+                    mime = mimetypes.guess_type(str(img_path))[0] or "image/png"
+                    st.markdown(
+                        f"""
+                        <style>
+                        .stApp {{
+                          background-color:#05060a;
+                          background-image: url("data:{mime};base64,{img_b64}");
+                          background-size: cover;
+                          background-position: center center;
+                          background-attachment: fixed;
+                          background-repeat: no-repeat;
+                        }}
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                except Exception:
+                    pass
     else:
         st.error(f"CSS file not found: {css_path}")
 
@@ -3138,138 +3429,138 @@ def goto(page_label: str):
 
 def page_home(conn, cfg):
     _init_home_state()
+    apply_premium_theme()
+
+    # Marker pentru a delimita clar scope-ul Dashboard-ului (Home)
+    st.markdown('<span id="dash-scope"></span>', unsafe_allow_html=True)
+
+    # CSS suplimentar: butoane narrow, aliniate stânga, DAR doar cât timp suntem în Dashboard (Home)
+    BTN_W = 270  # poți ajusta la 260/280 după gust
+    st.markdown(
+        f"""
+        <style>
+        /* Aplica DOAR cand exista #dash-scope (adica doar pe Dashboard/Home) */
+        section.main:has(#dash-scope) div[data-testid="stButton"]{{
+          width: {BTN_W}px !important;
+          max-width: {BTN_W}px !important;
+          margin-left: 0 !important;     /* aliniere stanga */
+          margin-right: auto !important; /* nu se intinde */
+          margin-top: 6px !important;    /* mic spacing intre butoane */
+        }}
+
+        /* butonul efectiv */
+        section.main:has(#dash-scope) div[data-testid="stButton"] > button{{
+          width: 100% !important;        /* umple cei {BTN_W}px */
+          height: 42px !important;
+          border-radius: 12px !important;
+          padding: 0 14px !important;
+
+          display: flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important; /* text/icon la stanga */
+          gap: 10px !important;
+
+          text-align: left !important;
+          background: rgba(255,255,255,0.06) !important;
+          border: 1px solid rgba(255,255,255,0.10) !important;
+          color: rgba(255,255,255,0.92) !important;
+        }}
+
+        section.main:has(#dash-scope) div[data-testid="stButton"] > button:hover{{
+          background: rgba(59,130,246,0.16) !important;
+          border-color: rgba(59,130,246,0.28) !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     user = st.session_state.get("username") or "utilizator"
-    st.markdown('<div class="bg-glow"></div>', unsafe_allow_html=True)
 
-    # HERO
-    st.markdown(f"""
-      <div class="home-hero">
-        <div class="title">👋 Bun venit, {user}</div>
-        <div class="subtitle">
-          Alege o acțiune rapidă sau folosește căutarea pentru a ajunge instant la un angajat.
-        </div>
-      </div>
-    """, unsafe_allow_html=True)
+    # SECTIUNE: Bun venit
+    st.markdown('<div class="s-card">', unsafe_allow_html=True)
+    st.markdown(f"### 👋 Bun venit, {user}")
+    st.caption("Alege o acțiune rapidă sau folosește căutarea pentru a ajunge instant la un angajat.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.write("")
+    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
-    # (A) CONTINUĂ + SCURTĂTURI (B) sus, fără aglomerație
-    left, right = st.columns([1.2, 2.0])
+    # SECTIUNE: Continuă (istoric recent)
+    st.markdown('<div class="s-card">', unsafe_allow_html=True)
+    st.markdown("### Continuă")
+    # “Continuă” = ultimul element din istoric
+    rec = st.session_state.get("home_recent", [])
+    if rec:
+        last = rec[0]
+        st.markdown(f"**{last['label']}**")
+        st.caption("Ultima acțiune / modul accesat.")
+        if st.button("Deschide", key="home_continue_btn"):
+            goto(last["target"])
+    else:
+        st.markdown("**Nicio activitate recentă**")
+        st.caption("După ce folosești aplicația, aici apare ultimul modul accesat.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    with left:
-        # “Continuă” = ultimul element din istoric
-        rec = st.session_state.get("home_recent", [])
-        if rec:
-            last = rec[0]
-            st.markdown(
-                f"""
-                <div class="home-continue">
-                  <div class="label">Continuă</div>
-                  <div class="value">{last["label"]}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            if st.button("Deschide", use_container_width=True, key="home_continue_btn"):
-                goto(last["target"])
-        else:
-            st.markdown(
-                """
-                <div class="home-continue">
-                  <div class="label">Continuă</div>
-                  <div class="value">Nicio activitate recentă</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            st.caption("După ce folosești aplicația, aici apare ultimul modul accesat.")
+    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
-    with right:
-        st.markdown("#### ⚡ Scurtături")
-        # Le ținem ca butoane (fiabile în Streamlit). “Chip”-urile HTML sunt doar vizual.
-        c1, c2, c3, c4 = st.columns(4)
+    # SECTIUNE: Scurtături (butoane narrow, una sub alta)
+    st.markdown('<div class="s-card">', unsafe_allow_html=True)
+    st.markdown("### ⚡ Scurtături")
+    if st.button("👤 Caută angajat", key="sh_find"):
+        goto("Angajați")
+    if st.button("➕ Adaugă angajat", key="sh_add"):
+        st.session_state["home_hint_action"] = "add_employee"
+        goto("Angajați")
+    if st.button("📄 Documente", key="sh_docs"):
+        goto("Dosar profesional")
+    if st.button("⚙️ Setări", key="sh_settings"):
+        goto("Configurare")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        with c1:
-            if st.button("👤 Caută angajat", use_container_width=True, key="home_short_search"):
-                goto("Angajați")
+    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
-        with c2:
-            if st.button("➕ Adaugă angajat", use_container_width=True, key="home_short_add"):
-                # nu schimbăm funcționalitatea; doar navigăm în modul
-                st.session_state["home_hint_action"] = "add_employee"
-                goto("Angajați")
-
-        with c3:
-            if st.button("📄 Documente", use_container_width=True, key="home_short_docs"):
-                goto("Dosar profesional")
-
-        with c4:
-            if st.button("⚙️ Setări", use_container_width=True, key="home_short_cfg"):
-                goto("Configurare")
-
-        st.caption("Scurtături = acces rapid la cele mai folosite acțiuni. Le rafinăm la final, când stabilim fluxurile exacte.")
-
-    st.write("")
-
-    # --- CĂUTARE RAPIDĂ ---
-    st.markdown('<div class="home-section">', unsafe_allow_html=True)
-    st.subheader("🔎 Căutare rapidă")
+    # SECTIUNE: Căutare rapidă (doar butoanele ei)
+    st.markdown('<div class="s-card">', unsafe_allow_html=True)
+    st.markdown("### 🔎 Căutare rapidă")
     q = st.text_input(
-        "Căutare rapidă",
+        "",
         placeholder="Ex: Popescu Ioana / 29xxxxxxxxxxxxx / EMP-1024",
         label_visibility="collapsed",
         key="home_query",
     )
-
-    c1, c2, c3 = st.columns([1, 1, 5])
-    with c1:
-        if st.button("Caută", use_container_width=True, key="home_search_btn"):
-            if q.strip():
-                add_recent("search", f"Căutare: {q.strip()}", "Angajați", {"query": q.strip()})
-                goto("Angajați")
-            else:
-                st.warning("Scrie un nume / CNP / ID.")
-    with c2:
-        if st.button("Curăță", use_container_width=True, key="home_clear_btn"):
-            st.session_state.home_query = ""
-            st.rerun()
-    with c3:
-        st.caption("Tip: CNP pentru potrivire exactă.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.write("")
-
-    # --- ACȚIUNI RAPIDE (module launcher) ---
-    st.markdown('<div class="home-section">', unsafe_allow_html=True)
-    st.subheader("⚡ Acțiuni rapide")
-    col1, col2, col3 = st.columns(3)
-
-    def action_card(title: str, desc: str, target: str, key: str):
-        st.markdown('<div class="home-card">', unsafe_allow_html=True)
-        st.markdown(f"**{title}**")
-        st.caption(desc)
-        if st.button("Deschide", use_container_width=True, key=key):
-            add_recent("nav", title, target)
-            goto(target)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col1:
-        action_card("👤 Angajați", "Fișă angajat, căutare, editare, export.", "Angajați", "go_emp")
-
-    with col2:
-        st.markdown('<div class="home-card">', unsafe_allow_html=True)
-        st.markdown("**👨‍👩‍👧‍👦 Întreținere**")
-        st.caption("Persoane în întreținere (în modulul Angajați).")
-        if st.button("Deschide", use_container_width=True, key="go_dep"):
-            add_recent("nav", "👨‍👩‍👧‍👦 Întreținere", "Angajați", {"hint": "dependents"})
-            st.session_state["home_hint_tab"] = "dependents"
+    if st.button("Caută", key="home_search_btn"):
+        if q.strip():
+            add_recent("search", f"Căutare: {q.strip()}", "Angajați", {"query": q.strip()})
             goto("Angajați")
-        st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Scrie un nume / CNP / ID.")
+    if st.button("Curăță", key="home_clear_btn"):
+        st.session_state.home_query = ""
+        st.rerun()
+    st.caption("Tip: CNP pentru potrivire exactă.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    with col3:
-        action_card("📄 Documente", "Decizii, adeverințe, export.", "Dosar profesional", "go_docs")
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
+
+    # SECTIUNE: Acțiuni rapide (una sub alta, narrow)
+    st.markdown('<div class="s-card">', unsafe_allow_html=True)
+    st.markdown("### ⚡ Acțiuni rapide")
+    if st.button("👥 Angajați", key="qa_emp"):
+        add_recent("nav", "Angajați", "Angajați", {})
+        goto("Angajați")
+    if st.button("👨‍👩‍👧‍👦 Întreținere", key="qa_dep"):
+        add_recent("nav", "Întreținere", "Angajați", {"hint": "dependents"})
+        st.session_state["home_hint_tab"] = "dependents"
+        goto("Angajați")
+    if st.button("📄 Documente", key="qa_docs"):
+        add_recent("nav", "Documente", "Dosar profesional", {})
+        goto("Dosar profesional")
+    if st.button("⏱️ Pontaj", key="qa_time"):
+        add_recent("nav", "Pontaj", "Pontaj", {})
+        goto("Pontaj")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
     # Patch final pentru dashboard (headings + text + input + butoane)
     apply_dashboard_patch()
@@ -7751,6 +8042,57 @@ def page_angajati(conn: sqlite3.Connection):
     - butoane: ADAUGĂ / MODIFICĂ / ȘTERGE
     - selectare angajat -> se deschide pagina DOAR cu acel angajat (detaliu complet)
     """
+    # Marker + CSS local: scoped doar pentru pagina Angajați (pentru titluri, filtre etc.)
+    st.markdown('<span id="emp-scope"></span>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        /* ===== Scoped doar pe pagina Angajați ===== */
+        section.main:has(#emp-scope) .emp-title{
+          font-size: 34px;
+          font-weight: 900;
+          margin: 0 0 6px 0;
+        }
+
+        section.main:has(#emp-scope) .emp-subtitle{
+          font-size: 26px;
+          font-weight: 600;
+          opacity: .95;
+          margin: 10px 0 10px 0;
+        }
+
+        /* Divider subțire */
+        section.main:has(#emp-scope) .thin-divider{
+          width: 100%;
+          height: 1px;
+          border-radius: 999px;
+          margin: 10px 0 14px 0;
+          background: rgba(255,255,255,0.10);
+        }
+
+        /* Card de filtre puțin mai compact */
+        section.main:has(#emp-scope) .filter-card{
+          padding: 16px 18px !important;
+        }
+
+        /* Search row: input + buton cu aceeași înălțime */
+        section.main:has(#emp-scope) .filter-card .stTextInput>div>div input{
+          height: 44px !important;
+          border-radius: 14px !important;
+        }
+        section.main:has(#emp-scope) .filter-card .stButton>button{
+          height: 44px !important;
+          border-radius: 14px !important;
+        }
+
+        /* Expander mai “tight” */
+        section.main:has(#emp-scope) .filter-card details > summary{
+          padding: 10px 14px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     def _dep_reset_form(K: str, set_new: bool = True) -> None:
         st.session_state[f"{K}edit_id"] = None
         for kk in (
@@ -9748,22 +10090,20 @@ def page_angajati(conn: sqlite3.Connection):
 
     st.markdown("<div class='emp-wrap'>", unsafe_allow_html=True)
 
-    header_left, header_right = st.columns([3, 1])
-    with header_left:
-        st.subheader("👥 Angajați")
-    with header_right:
-        st.markdown("<div class='emp-cta'>", unsafe_allow_html=True)
-        if st.button("➕ ADAUGĂ PERSONAL", key="ang_add_header_btn", use_container_width=True):
-            st.session_state["ang_view"] = "add"
-            st.session_state["ang_selected_id"] = None
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Header: titlu + buton imediat sub el
+    st.markdown('<div class="emp-title">👥 Angajați</div>', unsafe_allow_html=True)
+    add_personal = st.button("➕ ADAUGĂ PERSONAL", key="emp_add_personal")
+    if add_personal:
+        st.session_state["ang_view"] = "add"
+        st.session_state["ang_selected_id"] = None
+        st.rerun()
+    st.markdown('<div class="thin-divider"></div>', unsafe_allow_html=True)
 
     # CARD 1 – Filtru angajați (căutare)
-    st.markdown("<div class='emp-card emp-search'>", unsafe_allow_html=True)
-    st.markdown("#### Filtru angajați")
+    st.markdown("<div class='filter-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='emp-subtitle'>Filtru angajați</div>", unsafe_allow_html=True)
 
-    # State pentru filtre: aplicat doar la "Caută", nu live
+    # State pentru filtre: aplicat doar la \"Caută\", nu live
     if "ang_applied_filters" not in st.session_state:
         st.session_state["ang_applied_filters"] = {}
     if "ang_has_searched" not in st.session_state:
@@ -9777,34 +10117,51 @@ def page_angajati(conn: sqlite3.Connection):
         st.rerun()
 
     with st.form(key="ang_search_form"):
-        row_search_left, row_search_right = st.columns([5, 1])
-        with row_search_left:
+        # Rând 1: căutare rapidă + buton
+        st.markdown("<div class='filter-h3'>Caută rapid</div>", unsafe_allow_html=True)
+        r1c1, r1c2 = st.columns([0.80, 0.20], gap="small")
+        with r1c1:
             st.text_input(
-                "Caută rapid",
+                "",
                 value=st.session_state.get("ang_q_ui", ""),
                 key="ang_q_ui",
                 placeholder="Nume, prenume, CNP sau marcă",
+                label_visibility="collapsed",
             )
-        with row_search_right:
-            st.markdown("<div class='emp-primary'>", unsafe_allow_html=True)
+        with r1c2:
             submitted = st.form_submit_button("🔎 Caută", use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
 
+        # Spațiere + filtre avansate
+        st.markdown("<div class='vgap-12'></div>", unsafe_allow_html=True)
         with st.expander("Filtre avansate", expanded=False):
-            f_nume, f_prenume, f_cnp, f_marca = st.columns(4)
-            with f_nume:
+            left, right = st.columns(2, gap="small")
+
+            with left:
                 st.text_input("Nume", value=st.session_state.get("ang_nume_ui", ""), key="ang_nume_ui")
-            with f_prenume:
                 st.text_input("Prenume", value=st.session_state.get("ang_prenume_ui", ""), key="ang_prenume_ui")
-            with f_cnp:
+
+            with right:
                 st.text_input("CNP", value=st.session_state.get("ang_cnp_ui", ""), key="ang_cnp_ui")
-            with f_marca:
                 st.text_input("Marcă", value=st.session_state.get("ang_marca_ui", ""), key="ang_marca_ui")
-            row_toolbar_left, row_toolbar_right = st.columns([3, 1])
-            with row_toolbar_left:
-                st.checkbox("Doar activi", value=st.session_state.get("ang_active_only_ui", True), key="ang_active_only_ui")
-            with row_toolbar_right:
-                st.form_submit_button("Reset filtre", on_click=_ang_reset_filters, use_container_width=True, key="ang_reset_filters_btn")
+
+            a1, a2 = st.columns([0.75, 0.25], gap="small")
+            with a1:
+                st.checkbox(
+                    "Doar activi",
+                    value=st.session_state.get("ang_active_only_ui", True),
+                    key="ang_active_only_ui",
+                )
+            with a2:
+                reset_clicked = st.form_submit_button("Reset filtre", use_container_width=True, key="ang_reset_filters_btn")
+
+    # Logica de reset simplificată (fără să stricăm flow-ul existent)
+    if reset_clicked:
+        for k in ["ang_q_ui", "ang_nume_ui", "ang_prenume_ui", "ang_cnp_ui", "ang_marca_ui"]:
+            st.session_state[k] = ""
+        st.session_state["ang_active_only_ui"] = True
+        st.session_state.pop("ang_applied_filters", None)
+        st.session_state.pop("ang_has_searched", None)
+        st.rerun()
 
     if submitted:
         st.session_state["ang_applied_filters"] = {
@@ -9912,8 +10269,8 @@ def page_angajati(conn: sqlite3.Connection):
     st.markdown("#### Acțiuni")
     st.markdown(f"Angajat selectat: **{_fmt_emp(int(sel_id))}**")
 
-    # buton principal full-width
-    if st.button("👁 Deschide fișa", key="ang_open_detail", use_container_width=True):
+    # buton principal – narrow dar proeminent datorită CSS-ului emp-*
+    if st.button("👁 Deschide fișa", key="ang_open_detail"):
         st.session_state["ang_view"] = "detail"
         st.rerun()
 
@@ -13742,58 +14099,54 @@ def page_organigrama(conn):
             st.info("Nu există unități active în organigramă.")
             return
 
-        # ===== Layout: setări stânga, preview dreapta =====
-        left, right = st.columns([0.32, 0.68], gap="large")
+        # ===== PANOU CONTROL (sus) – Căutare, View, Export =====
+        st.markdown('<div class="s-card">', unsafe_allow_html=True)
+        st.markdown("### 🔎 Căutare & filtre")
 
-        with left:
-            st.markdown("<div class='org-panel org-sticky'>", unsafe_allow_html=True)
-            st.subheader("🔎 Căutare & filtre")
+        q = st.text_input(
+            "Caută unitate (după denumire)",
+            placeholder="Ex: Direcția IT",
+            key="org_q_unit",
+        )
 
-            q = st.text_input(
-                "Caută unitate (după denumire)",
-                placeholder="Ex: Direcția IT",
-                key="org_q_unit",
+        types = sorted([t for t in df_units["type"].dropna().astype(str).unique().tolist() if t.strip()])
+        sel_types = st.multiselect("Filtru tip", options=types, default=[], key="org_type_filter")
+
+        # Filtre active (chips) + Reset
+        has_query = bool((q or "").strip())
+        has_types = bool(sel_types)
+        if has_query or has_types:
+            st.caption("Filtre active")
+            chips = []
+            if has_query:
+                chips.append((q.strip(), "Căutare"))
+            for t in sel_types or []:
+                chips.append((str(t).strip(), "Tip"))
+            chip_html = " ".join(
+                f'<span class="org-chip" title="{label}: {val}">{val}</span>' for val, label in chips
             )
+            st.markdown(f"<div class='org-chips'>{chip_html}</div>", unsafe_allow_html=True)
+            if st.button("Reset filtre", key="org_reset_filters"):
+                st.session_state["org_q_unit"] = ""
+                st.session_state["org_type_filter"] = []
+                st.rerun()
 
-            types = sorted([t for t in df_units["type"].dropna().astype(str).unique().tolist() if t.strip()])
-            sel_types = st.multiselect("Filtru tip", options=types, default=[], key="org_type_filter")
+        st.markdown("---")
+        st.markdown("### 🎛️ View")
+        view_mode = st.radio(
+            "Mod vizualizare",
+            ["Vizual (interactiv)", "Arbore (text + export)"],
+            index=0,
+            key="org_view_mode",
+        )
 
-            # Filtre active (chips) + Reset
-            has_query = bool((q or "").strip())
-            has_types = bool(sel_types)
-            if has_query or has_types:
-                st.caption("Filtre active")
-                chips = []
-                if has_query:
-                    chips.append((q.strip(), "Căutare"))
-                for t in sel_types or []:
-                    chips.append((str(t).strip(), "Tip"))
-                chip_html = " ".join(
-                    f'<span class="org-chip" title="{label}: {val}">{val}</span>' for val, label in chips
-                )
-                st.markdown(f"<div class='org-chips'>{chip_html}</div>", unsafe_allow_html=True)
-                if st.button("Reset filtre", key="org_reset_filters"):
-                    st.session_state["org_q_unit"] = ""
-                    st.session_state["org_type_filter"] = []
-                    st.rerun()
+        st.markdown("---")
+        st.markdown("### 📤 Export rapid")
+        st.caption("Export PNG/JPEG/PDF există în modul vizual (din viewer).")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            st.divider()
-            st.subheader("🎛️ View")
-
-            view_mode = st.radio(
-                "Mod vizualizare",
-                ["Vizual (interactiv)", "Arbore (text + export)"],
-                index=0,
-                key="org_view_mode",
-            )
-
-            st.divider()
-            st.subheader("📤 Export rapid")
-
-            # Export rapid pentru arbore (text/docx) rămâne pe modul Arbore
-            st.caption("Export PNG/JPEG/PDF există în modul vizual (din viewer).")
-
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Separator fin între control și organigramă
+        st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
         # ===== Filter data =====
         df_view = df_units.copy()
@@ -13803,165 +14156,163 @@ def page_organigrama(conn):
             qq = q.strip().lower()
             df_view = df_view[df_view["name"].astype(str).str.lower().str.contains(qq)]
 
-        with right:
-            st.markdown("<div class='org-view'>", unsafe_allow_html=True)
-            # Header mic + hint
-            st.caption("Tip: pentru structură completă (toate legăturile), nu filtra tipurile.")
+        # ===== ORGANIGRAMĂ – full width sub panoul de control =====
+        st.markdown('<div class="s-card">', unsafe_allow_html=True)
+        st.markdown("### 🧩 Organigramă", unsafe_allow_html=True)
+        st.caption("Tip: pentru structură completă (toate legăturile), nu filtra tipurile.")
 
-            if view_mode == "Arbore (text + export)":
-                with st.expander("Organigramă ierarhică", expanded=True):
+        if view_mode == "Arbore (text + export)":
+            with st.expander("Organigramă ierarhică", expanded=True):
+                try:
+                    df_pos = load_org_positions_with_people(conn)
+                except Exception:
+                    df_pos = pd.DataFrame()
+
+                render_organigrama_tree(df_units, df_stat=df_pos, key_prefix="org_units_tree")
+
+                # export docx/txt: păstrezi codul tău existent (cel care construiește lines + download_button)
+                # îl lași EXACT cum e, doar mutat aici
+
+        else:
+            # Modul vizual interactiv (Cytoscape)
+            with st.expander("⚙️ Setări avansate", expanded=False):
+                cyto_box_scale = st.slider("📦 Mărime casete", 0.6, 3.0, 1.2, 0.1, key="cyto_box_scale_main")
+                cyto_font_size = st.slider("🔤 Font", 10, 34, 14, 1, key="cyto_font_size_main")
+                cyto_spacing = st.slider("↔️ Spacing", 0.6, 2.4, 1.0, 0.05, key="cyto_spacing_main")
+                cyto_start_collapsed = st.checkbox("Pornește colapsat (doar nivel 1)", True, key="cyto_start_collapsed_main")
+                cyto_enable_drag = st.checkbox("🖐️ Mută casete (Drag)", True, key="cyto_enable_drag_main")
+
+                cyto_custom_colors = st.checkbox("🎨 Culori personalizate", False, key="cyto_custom_colors_main")
+                cyto_colors = {}
+                if cyto_custom_colors:
+                    cc1, cc2, cc3 = st.columns(3)
+                    with cc1:
+                        cyto_colors["director_general"] = st.color_picker("DG", "#0B3C5D", key="cyto_col_dg")
+                    with cc2:
+                        cyto_colors["directie"] = st.color_picker("Direcție", "#457B9D", key="cyto_col_directie")
+                    with cc3:
+                        cyto_colors["default"] = st.color_picker("Default", "#D3E3F3", key="cyto_col_default")
+
+            # Construim payload complet (unități + poziții + oameni)
+            df_units_full = fetch_org_units(conn)
+            df_pos = fetch_positions_with_people(conn)
+            elements = build_cyto_elements(df_units_full, df_pos)
+            payload = cyto_elements_to_payload(elements)
+
+            render_org_cytoscape_collapsible(
+                None,
+                elements_payload=payload,
+                height=780,
+                key="org_cyto_main",
+                box_scale=float(st.session_state.get("cyto_box_scale_main", 1.2)),
+                font_size=int(st.session_state.get("cyto_font_size_main", 14)),
+                spacing=float(st.session_state.get("cyto_spacing_main", 1.0)),
+                start_collapsed=bool(st.session_state.get("cyto_start_collapsed_main", True)),
+                enable_drag=bool(st.session_state.get("cyto_enable_drag_main", True)),
+                enable_save_layout=True,
+                use_saved_layout=True,
+                color_overrides=cyto_colors if st.session_state.get("cyto_custom_colors_main") else None,
+            )
+
+            # Detalii despre selecție (unitate / persoană / poziție)
+            emp_q = st.query_params.get("emp_id")
+            pos_q = st.query_params.get("pos_id")
+            unit_q = st.query_params.get("unit_id")
+
+            try:
+                emp_id = int(str(emp_q)) if emp_q is not None else None
+            except ValueError:
+                emp_id = None
+
+            try:
+                unit_id = int(str(unit_q)) if unit_q is not None else None
+            except ValueError:
+                unit_id = None
+
+            st.markdown("<div class='org-panel'>", unsafe_allow_html=True)
+            st.markdown("#### Detalii selecție")
+            st.caption("Selectează o unitate, un post sau o persoană din organigramă pentru a vedea detalii aici.")
+
+            # 1) Dacă avem emp_id în query params, afișăm direct profilul angajatului (din bundle)
+            if emp_id is not None:
+                bundle_org = load_employee_bundle(get_db_path(), emp_id)
+                emp_row = bundle_org.get("employee") or {}
+                if not emp_row:
+                    st.warning("Persoana selectată nu a putut fi găsită.")
+                else:
+                    _eid = emp_row.get("id") or emp_id
+                    full_name = f"{ (emp_row.get('last_name') or '').strip() } { (emp_row.get('first_name') or '').strip() }".strip() or "(necunoscut)"
+                    functie = (emp_row.get("functie") or "").strip()
+                    email = (emp_row.get("email") or "").strip()
+                    telefon = (emp_row.get("telefon") or emp_row.get("mobil") or "").strip()
+                    departament = (emp_row.get("departament") or "").strip()
+                    unit_name = (emp_row.get("unit_name") or emp_row.get("loc_munca") or "").strip()
+
+                    # Foto angajat (dacă există) – query separat (nu e în bundle)
+                    prow = None
                     try:
-                        df_pos = load_org_positions_with_people(conn)
+                        cur = conn.cursor()
+                        prow = cur.execute(
+                            "SELECT mime, img FROM employee_photos WHERE employee_id = ?",
+                            (_eid,),
+                        ).fetchone()
                     except Exception:
-                        df_pos = pd.DataFrame()
+                        pass
 
-                    render_organigrama_tree(df_units, df_stat=df_pos, key_prefix="org_units_tree")
+                    if prow and prow[1]:
+                        mime, img_blob = prow
+                        try:
+                            st.image(BytesIO(img_blob), caption=full_name or "Fotografie", use_container_width=True)
+                        except Exception:
+                            pass
 
-                    # export docx/txt: păstrezi codul tău existent (cel care construiește lines + download_button)
-                    # îl lași EXACT cum e, doar mutat aici
+                    st.write(f"**Nume**: {full_name or '(necunoscut)'}")
+                    if functie:
+                        st.write(f"**Funcție**: {functie}")
+                    if email:
+                        st.write(f"**Email**: {email}")
+                    if telefon:
+                        st.write(f"**Telefon**: {telefon}")
+                    if unit_name or departament:
+                        st.write(
+                            f"**Unitate / departament**: "
+                            f"{unit_name or ''}{' – ' if unit_name and departament else ''}{departament or ''}"
+                        )
 
-            else:
-                # Modul vizual interactiv (Cytoscape)
-                with st.expander("🧩 Organigramă interactivă", expanded=True):
-                    # Setări avansate doar pentru modul vizual
-                    with st.expander("⚙️ Setări avansate", expanded=False):
-                        cyto_box_scale = st.slider("📦 Mărime casete", 0.6, 3.0, 1.2, 0.1, key="cyto_box_scale_main")
-                        cyto_font_size = st.slider("🔤 Font", 10, 34, 14, 1, key="cyto_font_size_main")
-                        cyto_spacing = st.slider("↔️ Spacing", 0.6, 2.4, 1.0, 0.05, key="cyto_spacing_main")
-                        cyto_start_collapsed = st.checkbox("Pornește colapsat (doar nivel 1)", True, key="cyto_start_collapsed_main")
-                        cyto_enable_drag = st.checkbox("🖐️ Mută casete (Drag)", True, key="cyto_enable_drag_main")
-
-                        cyto_custom_colors = st.checkbox("🎨 Culori personalizate", False, key="cyto_custom_colors_main")
-                        cyto_colors = {}
-                        if cyto_custom_colors:
-                            cc1, cc2, cc3 = st.columns(3)
-                            with cc1:
-                                cyto_colors["director_general"] = st.color_picker("DG", "#0B3C5D", key="cyto_col_dg")
-                            with cc2:
-                                cyto_colors["directie"] = st.color_picker("Direcție", "#457B9D", key="cyto_col_directie")
-                            with cc3:
-                                cyto_colors["default"] = st.color_picker("Default", "#D3E3F3", key="cyto_col_default")
-
-                    # Construim payload complet (unități + poziții + oameni)
-                    df_units_full = fetch_org_units(conn)
-                    df_pos = fetch_positions_with_people(conn)
-                    elements = build_cyto_elements(df_units_full, df_pos)
-                    payload = cyto_elements_to_payload(elements)
-
-                    render_org_cytoscape_collapsible(
-                        None,
-                        elements_payload=payload,
-                        height=780,
-                        key="org_cyto_main",
-                        box_scale=float(st.session_state.get("cyto_box_scale_main", 1.2)),
-                        font_size=int(st.session_state.get("cyto_font_size_main", 14)),
-                        spacing=float(st.session_state.get("cyto_spacing_main", 1.0)),
-                        start_collapsed=bool(st.session_state.get("cyto_start_collapsed_main", True)),
-                        enable_drag=bool(st.session_state.get("cyto_enable_drag_main", True)),
-                        enable_save_layout=True,
-                        use_saved_layout=True,
-                        color_overrides=cyto_colors if st.session_state.get("cyto_custom_colors_main") else None,
+                    # Upload / actualizare fotografie
+                    uploaded = st.file_uploader(
+                        "Încarcă / actualizează fotografia",
+                        type=["png", "jpg", "jpeg"],
+                        key=f"emp_photo_{_eid}",
                     )
-
-                    # Detalii despre selecție (unitate / persoană / poziție)
-                    emp_q = st.query_params.get("emp_id")
-                    pos_q = st.query_params.get("pos_id")
-                    unit_q = st.query_params.get("unit_id")
-
-                    try:
-                        emp_id = int(str(emp_q)) if emp_q is not None else None
-                    except ValueError:
-                        emp_id = None
-
-                    try:
-                        unit_id = int(str(unit_q)) if unit_q is not None else None
-                    except ValueError:
-                        unit_id = None
-
-                    st.markdown("<div class='org-panel'>", unsafe_allow_html=True)
-                    st.markdown("#### Detalii selecție")
-                    st.caption("Selectează o unitate, un post sau o persoană din organigramă pentru a vedea detalii aici.")
-
-                    # 1) Dacă avem emp_id în query params, afișăm direct profilul angajatului (din bundle)
-                    if emp_id is not None:
-                        bundle_org = load_employee_bundle(get_db_path(), emp_id)
-                        emp_row = bundle_org.get("employee") or {}
-                        if not emp_row:
-                            st.warning("Persoana selectată nu a putut fi găsită.")
-                        else:
-                            _eid = emp_row.get("id") or emp_id
-                            full_name = f"{ (emp_row.get('last_name') or '').strip() } { (emp_row.get('first_name') or '').strip() }".strip() or "(necunoscut)"
-                            functie = (emp_row.get("functie") or "").strip()
-                            email = (emp_row.get("email") or "").strip()
-                            telefon = (emp_row.get("telefon") or emp_row.get("mobil") or "").strip()
-                            departament = (emp_row.get("departament") or "").strip()
-                            unit_name = (emp_row.get("unit_name") or emp_row.get("loc_munca") or "").strip()
-
-                            # Foto angajat (dacă există) – query separat (nu e în bundle)
-                            prow = None
-                            try:
-                                cur = conn.cursor()
-                                prow = cur.execute(
-                                    "SELECT mime, img FROM employee_photos WHERE employee_id = ?",
-                                    (_eid,),
-                                ).fetchone()
-                            except Exception:
-                                pass
-
-                            if prow and prow[1]:
-                                mime, img_blob = prow
-                                try:
-                                    st.image(BytesIO(img_blob), caption=full_name or "Fotografie", use_container_width=True)
-                                except Exception:
-                                    pass
-
-                            st.write(f"**Nume**: {full_name or '(necunoscut)'}")
-                            if functie:
-                                st.write(f"**Funcție**: {functie}")
-                            if email:
-                                st.write(f"**Email**: {email}")
-                            if telefon:
-                                st.write(f"**Telefon**: {telefon}")
-                            if unit_name or departament:
-                                st.write(
-                                    f"**Unitate / departament**: "
-                                    f"{unit_name or ''}{' – ' if unit_name and departament else ''}{departament or ''}"
-                                )
-
-                            # Upload / actualizare fotografie
-                            uploaded = st.file_uploader(
-                                "Încarcă / actualizează fotografia",
-                                type=["png", "jpg", "jpeg"],
-                                key=f"emp_photo_{_eid}",
+                    if uploaded is not None:
+                        try:
+                            img_bytes = uploaded.read()
+                            mime = uploaded.type or "image/jpeg"
+                            cur.execute(
+                                """
+                                INSERT INTO employee_photos(employee_id, mime, img, updated_at)
+                                VALUES (?, ?, ?, datetime('now'))
+                                ON CONFLICT(employee_id) DO UPDATE SET
+                                    mime=excluded.mime,
+                                    img=excluded.img,
+                                    updated_at=excluded.updated_at
+                                """,
+                                (_eid, mime, img_bytes),
                             )
-                            if uploaded is not None:
-                                try:
-                                    img_bytes = uploaded.read()
-                                    mime = uploaded.type or "image/jpeg"
-                                    cur.execute(
-                                        """
-                                        INSERT INTO employee_photos(employee_id, mime, img, updated_at)
-                                        VALUES (?, ?, ?, datetime('now'))
-                                        ON CONFLICT(employee_id) DO UPDATE SET
-                                            mime=excluded.mime,
-                                            img=excluded.img,
-                                            updated_at=excluded.updated_at
-                                        """,
-                                        (_eid, mime, img_bytes),
-                                    )
-                                    conn.commit()
-                                    st.success("Fotografia a fost salvată.")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Eroare la salvarea fotografiei: {e}")
+                            conn.commit()
+                            st.success("Fotografia a fost salvată.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Eroare la salvarea fotografiei: {e}")
 
-                            if st.button("Înapoi la unitate", key="back_to_unit_from_emp"):
-                                qs = dict(st.query_params)
-                                qs.pop("emp_id", None)
-                                st.query_params.clear()
-                                for k, v in qs.items():
-                                    st.query_params[k] = v
-                                st.rerun()
+                    if st.button("Înapoi la unitate", key="back_to_unit_from_emp"):
+                        qs = dict(st.query_params)
+                        qs.pop("emp_id", None)
+                        st.query_params.clear()
+                        for k, v in qs.items():
+                            st.query_params[k] = v
+                        st.rerun()
 
                     # 2) Dacă avem pos_id în query params (și nu avem emp_id), afișăm detalii despre post
                     elif pos_q is not None:
@@ -14296,6 +14647,8 @@ def page_organigrama(conn):
     # ===========================
     with tab_struct:
         st.markdown("### Structură internă: posturi și personal")
+        # Bar fin de delimitare față de tab-uri
+        st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
         # Încercăm să citim statul de funcții
         try:
@@ -14447,6 +14800,7 @@ def page_organigrama(conn):
                 with k3:
                     st.metric(third_label, n_third if third_label != "—" else "—")
 
+                # Tabel glass dark (override pentru albul default)
                 st.dataframe(df_view, use_container_width=True)
 
                 st.caption(
@@ -15641,20 +15995,10 @@ def page_pontaj_hub(conn, cfg: dict):
 
 
 def main():
-    # Lărgim containerul central pe toată pagina
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            max-width: 100% !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    # Layout și temă globală
     # st.set_page_config(page_title=APP_TITLE, layout="wide")
+    apply_premium_theme()
+    apply_centered_layout(1280)
 
     cfg = load_config()
     db_path = cfg.get("db_path", DB_PATH_DEFAULT)
@@ -15739,6 +16083,14 @@ def main():
     )
 
     main_choice = st.session_state.get("main_choice", "🏠 Acasă")
+
+    # Fundal per pagină: imagine doar pe Acasă, albastru solid pe restul
+    # Scoatem emoji-ul pentru comparația cu apply_page_background
+    if main_choice.startswith("🏠"):
+        logical_page = "Acasă"
+    else:
+        logical_page = main_choice
+    apply_page_background(logical_page, home_bg_css=HOME_BG_CSS)
 
     if main_choice == "Dosar profesional":
         st.session_state.setdefault(
