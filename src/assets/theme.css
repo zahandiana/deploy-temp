@@ -435,6 +435,26 @@ div[data-baseweb="input"] input::placeholder{
   margin-top: 10px;
 }
 
+/* Home: câmpuri de căutare – capsulă dark, fără alb dedesubt */
+.home-section div[data-baseweb="input"]{
+  background: #0B1220 !important;
+  border: 1px solid #263244 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.home-section div[data-baseweb="input"] > div,
+.home-section div[data-baseweb="input"] *{
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.home-section .stTextInput input{
+  background: transparent !important;
+  color: #F8FAFC !important;
+}
+.home-section .stTextInput input::placeholder{
+  color: #CBD5E1 !important;
+}
+
 /* ===== ORGANIGRAMĂ (scoped) ===== */
 .org-wrap{
   position: relative;
@@ -803,6 +823,21 @@ section[data-testid="stSidebar"] .sb-foot{
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(255,255,255,0.08);
+}
+section[data-testid="stSidebar"] .sb-foot .stButton>button{
+  width: 100%;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.04) !important;  /* la fel ca butoanele de meniu */
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.88) !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] .sb-foot .stButton>button:hover{
+  border-color: rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: #fff !important;
 }
 section[data-testid="stSidebar"] .sb-foot .small{
   color: rgba(255,255,255,0.52);
@@ -1240,16 +1275,17 @@ section[data-testid="stSidebar"] .sb-dosar label[data-baseweb="radio"]:has(input
     margin-top: 2px;
   }
   
-  /* Cards */
+  /* Cards – glass dark, nu alb */
   .emp-wrap .emp-card{
     position: relative;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: rgba(7,11,18,0.78);
+    border: 1px solid rgba(15,23,42,0.85);
     border-radius: 18px;
     padding: 14px 14px;
     margin: 12px 0;
-    box-shadow: 0 18px 45px rgba(0,0,0,0.22);
-    backdrop-filter: blur(10px);
+    box-shadow: 0 18px 45px rgba(0,0,0,0.45);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     overflow: hidden;
   }
   .emp-wrap .emp-card::after{
@@ -1263,12 +1299,12 @@ section[data-testid="stSidebar"] .sb-dosar label[data-baseweb="radio"]:has(input
     opacity: 0.55;
   }
   
-  /* Section “tone” (discrete) */
+  /* Section “tone” (discrete) – glass dark, fără alb */
   .emp-wrap .emp-search{
-    background: linear-gradient(180deg, rgba(115,150,190,0.07), rgba(255,255,255,0.02));
+    background: linear-gradient(180deg, rgba(15,23,42,0.90), rgba(15,23,42,0.72));
   }
   .emp-wrap .emp-actions{
-    background: linear-gradient(180deg, rgba(200,170,110,0.06), rgba(255,255,255,0.02));
+    background: linear-gradient(180deg, rgba(15,23,42,0.90), rgba(15,23,42,0.72));
   }
   
   /* Left accent bar */
