@@ -40,6 +40,7 @@ html, body { background: #070B12 !important; color: #E5E7EB !important; }
 [data-testid="stMain"],
 [data-testid="stSidebar"] {
   background: transparent !important;
+}
 
 /* D) TextInput/PasswordInput: vopsește WRAPPER-ul BaseWeb (nu doar input-ul) */
 div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
@@ -308,7 +309,7 @@ div[data-testid="stTextInput"] div[data-baseweb="base-input"] *[style*="backgrou
 
 APP_THEME_CSS = """
 <style>
-/* ============ SOCRATES DARK THEME PACK (GLOBAL) ============ */
+/* ============ SOCRATES DARK THEME PACK (BASE) ============ */
 :root{
   color-scheme: dark !important;          /* ignoră tema OS */
   --bg: #070B12;
@@ -316,108 +317,25 @@ APP_THEME_CSS = """
   --surface2: #0F172A;
   --border: #263244;
   --text: #F8FAFC;                        /* alb curat */
-  --muted: #E5E7EB;                       /* “gri” dar super lizibil */
-  --muted2: #CBD5E1;                      /* pentru captions/help */
-  --accent: #22C55E;
+  --muted: #CBD5E1;                       /* text secundar lizibil */
+  --muted2: #94A3B8;                      /* captions/help */
+  --accent: rgba(34,197,94,0.55);
 
   --tab-bg: #0B1220;
   --tab-active: #0F172A;
   --tab-border: #263244;
 }
 
-/* Background global */
 html, body { background: var(--bg) !important; color: var(--text) !important; }
 [data-testid="stAppViewContainer"] { background: var(--bg) !important; color: var(--text) !important; }
-[data-testid="stSidebar"] { background: var(--surface) !important; color: var(--text) !important; }
+/* Sidebar lasă background-ul de imagine/gradient; doar culoarea textului rămâne controlată */
+[data-testid="stSidebar"] { background: transparent !important; color: var(--text) !important; }
 
-/* Text baseline: scapă de griuri spalăcite */
-[data-testid="stMarkdownContainer"], 
-[data-testid="stMarkdownContainer"] * { color: var(--text) !important; }
-
-/* Captions și “help text” sunt prea gri by default: le facem lizibile */
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] span{
-  color: var(--muted2) !important;
-  opacity: 1 !important;
-}
-
-/* Labels (Utilizator/Parolă etc.) */
-label, [data-testid="stWidgetLabel"] * {
-  color: var(--text) !important;
-  opacity: 1 !important;
-}
-
-/* Inputs / Select / Textarea: uniform dark */
-div[data-baseweb="input"] > div,
-div[data-baseweb="textarea"] > div,
-div[data-baseweb="select"] > div{
-  background: var(--surface2) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: none !important;
-  border-radius: 14px !important;
-  overflow: hidden !important;
-}
-div[data-baseweb="input"] input,
-div[data-baseweb="textarea"] textarea{
-  background: transparent !important;
-  color: var(--text) !important;
-}
-div[data-baseweb="input"] input::placeholder,
-div[data-baseweb="textarea"] textarea::placeholder{
-  color: var(--muted2) !important;
-}
-
-/* Chrome autofill (alb/galben) */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill{
-  -webkit-text-fill-color: var(--text) !important;
-  box-shadow: 0 0 0px 1000px var(--surface2) inset !important;
-  transition: background-color 9999s ease-out 0s;
-}
-
-/* Button styling consistent */
-.stButton button{
-  background: var(--surface2) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
-}
-.stButton button:hover{
-  border-color: rgba(34,197,94,0.55) !important;
-}
-
-/* Expander title text */
-div[data-testid="stExpander"] summary * {
-  color: var(--text) !important;
-}
-
-/* Metrics (label-ul e de obicei gri) */
-[data-testid="stMetricLabel"] * { color: var(--muted) !important; opacity: 1 !important; }
-[data-testid="stMetricValue"] * { color: var(--text) !important; }
-
-/* Text secundar: captions/help/markdown mic nu devine gri spălăcit */
-[data-testid="stCaptionContainer"] * ,
-small, .stMarkdown p, .stMarkdown span {
-  color: var(--muted2) !important;
-  opacity: 1 !important;
-}
-
-/* Label-uri și titluri: alb curat */
-label, [data-testid="stWidgetLabel"] * {
-  color: var(--text) !important;
-  opacity: 1 !important;
-}
-
-/* ============ TABS (st.tabs) ============ */
-/* tablist container */
+/* Tabs de bază – restul e rafinat în patch-ul post-render */
 div[data-testid="stTabs"] [role="tablist"]{
   border-bottom: 0 !important;
   gap: 10px !important;
 }
-/* tab button default */
 div[data-testid="stTabs"] button[role="tab"]{
   background: var(--tab-bg) !important;
   color: var(--muted2) !important;
@@ -426,16 +344,735 @@ div[data-testid="stTabs"] button[role="tab"]{
   padding: 8px 14px !important;
   margin: 0 !important;
 }
-/* tab active */
 div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
   background: var(--tab-active) !important;
   color: var(--text) !important;
   border-color: rgba(34,197,94,0.6) !important;
   box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
 }
-/* tab panel spacing */
 div[data-testid="stTabs"] [role="tabpanel"]{
   padding-top: 12px !important;
+}
+</style>
+"""
+
+APP_POST_RENDER_CSS = """
+<style>
+/* =========================
+   PHASE 1: RESET (neutralize)
+   ========================= */
+:root { color-scheme: dark !important; }
+
+div[data-testid="stTextInputRootElement"],
+div[data-testid="stNumberInputRootElement"],
+div[data-testid="stTextAreaRootElement"],
+div[data-testid="stSelectbox"],
+div[data-testid="stMultiSelect"],
+div[data-testid="stDateInput"],
+div[data-testid="stTimeInput"],
+div[data-testid="stFileUploader"],
+div[data-testid="stTabs"],
+div[data-testid="stForm"],
+div[data-testid="stExpander"]{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* BaseWeb wrappers: scoatem “skin”-ul */
+div[data-baseweb],
+div[data-baseweb] > div,
+div[data-baseweb] > div > div{
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* =========================
+   PHASE 2: THEME (re-color)
+   ========================= */
+:root{
+  --bg: #070B12;
+  --surface: #0B1220;
+  --surface2: #0F172A;
+  --border: #263244;
+  --text: #F8FAFC;
+  --muted: #CBD5E1;
+  --muted2: #94A3B8;
+  --accent: rgba(34,197,94,0.55);
+}
+
+html, body { background: var(--bg) !important; color: var(--text) !important; }
+[data-testid="stAppViewContainer"]{ background: transparent !important; color: var(--text) !important; }
+[data-testid="stMain"]{ color: var(--text) !important; }
+/* Sidebar păstrează albastrul din background (imagine/gradient); doar textul e controlat */
+[data-testid="stSidebar"]{ background: transparent !important; color: var(--text) !important; }
+
+/* Headings + markdown lizibile (fără gri spălăcit) */
+h1,h2,h3,h4,h5,h6 { color: var(--text) !important; opacity: 1 !important; }
+[data-testid="stMarkdownContainer"] * { color: var(--text) !important; opacity: 1 !important; }
+
+/* Captions/help: nu le lăsăm invizibile */
+[data-testid="stCaptionContainer"] *{
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+/* INPUT ROOT (stabil) – capsulă unitară ca în login */
+div[data-testid="stTextInputRootElement"],
+div[data-testid="stNumberInputRootElement"],
+div[data-testid="stTextAreaRootElement"]{
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+/* input/textarea efectiv */
+div[data-testid="stTextInputRootElement"] input,
+div[data-testid="stNumberInputRootElement"] input,
+div[data-testid="stTextAreaRootElement"] textarea{
+  background: transparent !important;
+  color: var(--text) !important;
+  caret-color: var(--text) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* placeholder */
+div[data-testid="stTextInputRootElement"] input::placeholder,
+div[data-testid="stTextAreaRootElement"] textarea::placeholder{
+  color: var(--muted2) !important;
+  opacity: 1 !important;
+}
+
+/* end-enhancer/eye etc: transparent (să nu bage alb) */
+div[data-testid="stTextInputRootElement"] button,
+div[data-testid="stTextInputRootElement"] [role="button"],
+div[data-testid="stTextInputRootElement"] svg{
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--text) !important;
+  fill: var(--text) !important;
+}
+
+/* autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill{
+  -webkit-text-fill-color: var(--text) !important;
+  box-shadow: 0 0 0px 1000px var(--surface) inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* Focus coerent */
+div[data-testid="stTextInputRootElement"]:focus-within,
+div[data-testid="stNumberInputRootElement"]:focus-within,
+div[data-testid="stTextAreaRootElement"]:focus-within{
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
+}
+
+/* Buttons coerente */
+.stButton button{
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.stButton button:hover{
+  border-color: var(--accent) !important;
+}
+
+/* Tabs uniforme */
+div[data-testid="stTabs"] button[role="tab"]{
+  background: var(--surface) !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+}
+div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.12) !important;
+}
+
+/* ===== Sidebar buttons: Logout + Help (target by key) ===== */
+[data-testid="stSidebar"] .st-key-sidebar_btn_logout button,
+[data-testid="stSidebar"] .st-key-sidebar_btn_help button {
+  background: transparent !important;         /* transparent, cum ai cerut */
+  color: #F8FAFC !important;                  /* text alb */
+  border: 1px solid #263244 !important;       /* border subtil */
+  border-radius: 999px !important;            /* pill */
+  box-shadow: none !important;
+  width: 100% !important;                     /* să arate “uniform” în coloane */
+  padding: 10px 14px !important;
+}
+
+/* hover/focus: fără alburi, doar accent discret */
+[data-testid="stSidebar"] .st-key-sidebar_btn_logout button:hover,
+[data-testid="stSidebar"] .st-key-sidebar_btn_help button:hover {
+  border-color: rgba(34, 197, 94, 0.55) !important;
+  background: rgba(15, 23, 42, 0.35) !important;
+}
+
+[data-testid="stSidebar"] .st-key-sidebar_btn_logout button:focus,
+[data-testid="stSidebar"] .st-key-sidebar_btn_help button:focus,
+[data-testid="stSidebar"] .st-key-sidebar_btn_logout button:focus-visible,
+[data-testid="stSidebar"] .st-key-sidebar_btn_help button:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18) !important;
+}
+
+/* dacă Streamlit pune background pe wrapper intern, îl “spălăm” */
+[data-testid="stSidebar"] .st-key-sidebar_btn_logout * ,
+[data-testid="stSidebar"] .st-key-sidebar_btn_help * {
+  background-color: transparent !important;
+}
+
+/* variantă de rezervă: dacă key-ul e pe div[data-testid="stButton"] direct */
+[data-testid="stSidebar"] div[data-testid="stButton"].st-key-sidebar_btn_logout button,
+[data-testid="stSidebar"] div[data-testid="stButton"].st-key-sidebar_btn_help button { 
+  background: transparent !important;
+  color: #F8FAFC !important;
+  border: 1px solid #263244 !important;
+  border-radius: 999px !important;
+}
+
+/* ===== TOP BAR: match sidebar palette + glass menus ===== */
+
+:root{
+  /* ajustează fin dacă vrei mai albastru/mai verde */
+  --topA: rgba(10, 30, 45, 0.72);     /* petrol dark */
+  --topB: rgba(14, 55, 70, 0.62);     /* petrol/teal */
+  --glass: rgba(7, 11, 18, 0.35);
+  --glass2: rgba(15, 23, 42, 0.35);
+  --border: rgba(38, 50, 68, 0.85);
+  --text: #F8FAFC;
+  --accent: rgba(34,197,94,0.45);
+}
+
+/* 1) Header: gradient în ton cu sidebar */
+header[data-testid="stHeader"]{
+  background: linear-gradient(90deg, var(--topA), var(--topB)) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* 2) Decorative strip: transparent */
+div[data-testid="stDecoration"]{
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 3) Toolbar: păstrat, dar glass */
+div[data-testid="stToolbar"]{
+  background: transparent !important;
+}
+div[data-testid="stToolbar"] *{
+  color: var(--text) !important;
+  fill: var(--text) !important;
+  opacity: 1 !important;
+}
+
+/* 4) Butoane din toolbar (Deploy + …) glass – va fi rafinat de blocul final kebaB */
+div[data-testid="stToolbar"] button,
+div[data-testid="stToolbar"] [role="button"]{
+  background: var(--glass2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+div[data-testid="stToolbar"] button:hover,
+div[data-testid="stToolbar"] [role="button"]:hover{
+  background: rgba(15,23,42,0.55) !important;
+  border-color: var(--accent) !important;
+}
+div[data-testid="stToolbar"] button:focus,
+div[data-testid="stToolbar"] button:focus-visible{
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.18) !important;
+}
+
+/* 5) Kebab menu dropdown (popup/portal): glass dark */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div{
+  background: rgba(10, 30, 45, 0.72) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+/* meniul în sine */
+[role="menu"],
+[role="menu"] > *{
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+/* item-urile din meniu */
+[role="menuitem"]{
+  color: var(--text) !important;
+}
+[role="menuitem"]:hover{
+  background: rgba(15,23,42,0.55) !important;
+}
+
+/* text/icon în popover */
+div[data-baseweb="popover"] *{
+  color: var(--text) !important;
+  fill: var(--text) !important;
+  stroke: var(--text) !important;
+}
+
+/* fallback pentru popup-uri */
+[role="dialog"],
+[role="dialog"] > div{
+  background: rgba(10, 30, 45, 0.72) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(38,50,68,0.85) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+/* ===== TOP BAR: match SIDEBAR palette (same gradient) ===== */
+header[data-testid="stHeader"]{
+  /* copiat ca stil din sidebar: radial-gradient(900px 600px at 0% 0%, rgba(15,23,42,0.90), rgba(15,23,42,0.80)) */
+  background: radial-gradient(900px 600px at 0% 0%,
+              rgba(15,23,42,0.86),
+              rgba(15,23,42,0.72)) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(15,23,42,0.85) !important;
+}
+
+div[data-testid="stDecoration"]{
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ===== Toolbar buttons (Deploy + …) -> glass ===== */
+div[data-testid="stToolbar"]{
+  background: transparent !important;
+}
+div[data-testid="stToolbar"] button,
+div[data-testid="stToolbar"] [role="button"]{
+  background: rgba(15,23,42,0.35) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+div[data-testid="stToolbar"] button:hover,
+div[data-testid="stToolbar"] [role="button"]:hover{
+  background: rgba(15,23,42,0.55) !important;
+  border-color: rgba(34,197,94,0.45) !important;
+}
+div[data-testid="stToolbar"] *{
+  color: rgba(248,250,252,0.95) !important;
+  fill: rgba(248,250,252,0.95) !important;
+  stroke: rgba(248,250,252,0.95) !important;
+}
+
+/* ===== “…” dropdown / menus (Streamlit portals) -> GLASS ===== */
+/* Target general pentru popovers/menus (Streamlit le randă în portal în afara app container) */
+body > div[role="dialog"],
+body > div[role="dialog"] > div,
+body > div[data-baseweb="popover"],
+body > div[data-baseweb="popover"] > div,
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div{
+  background: rgba(15,23,42,0.82) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35) !important;
+}
+
+/* Meniul și item-urile: fără “white tiles” */
+body > div[role="dialog"] [role="menu"],
+body > div[role="dialog"] [role="menu"] *{
+  background: transparent !important;
+  color: rgba(248,250,252,0.95) !important;
+  fill: rgba(248,250,252,0.95) !important;
+}
+
+/* Butoanele din meniu (acolo unde se vede alb) */
+body > div[role="dialog"] button,
+body > div[role="dialog"] a,
+body > div[role="dialog"] [role="menuitem"]{
+  background: transparent !important;
+  color: rgba(248,250,252,0.95) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Hover pe meniu */
+body > div[role="dialog"] [role="menuitem"]:hover,
+body > div[role="dialog"] button:hover{
+  background: rgba(15,23,42,0.55) !important;
+}
+
+/* Separatoare din dropdown */
+body > div[role="dialog"] hr{
+  border-color: rgba(148,163,184,0.18) !important;
+}
+
+/* ===== STREAMLIT TOOLBAR MENU (kebab "...") - make it readable ALWAYS ===== */
+
+/* 1) Containerul popup-ului: glass dark */
+body > div[role="dialog"],
+body > div[data-baseweb="popover"],
+div[data-baseweb="popover"] {
+  background: rgba(15,23,42,0.82) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35) !important;
+  color: rgba(248,250,252,0.95) !important;
+}
+
+/* 2) HAMMER: elimină *orice* background alb din interior */
+body > div[role="dialog"] * ,
+body > div[data-baseweb="popover"] * ,
+div[data-baseweb="popover"] * {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: rgba(248,250,252,0.95) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
+/* 3) Item-uri meniu: "chip" dark, lizibil */
+body > div[role="dialog"] [role="menuitem"],
+body > div[role="dialog"] button,
+body > div[role="dialog"] a,
+body > div[data-baseweb="popover"] [role="menuitem"],
+body > div[data-baseweb="popover"] button,
+body > div[data-baseweb="popover"] a {
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+}
+
+/* 4) Hover/focus (discret, premium) */
+body > div[role="dialog"] [role="menuitem"]:hover,
+body > div[role="dialog"] button:hover,
+body > div[data-baseweb="popover"] [role="menuitem"]:hover,
+body > div[data-baseweb="popover"] button:hover {
+  background: rgba(15,23,42,0.55) !important;
+  border: 1px solid rgba(34,197,94,0.35) !important;
+}
+
+/* 5) Separatoare (liniile dintre secțiuni) */
+body > div[role="dialog"] hr,
+body > div[data-baseweb="popover"] hr {
+  border-color: rgba(148,163,184,0.18) !important;
+}
+
+/* ===== STREAMLIT KEBAB ICON: remove white tile by replacing icon ===== */
+
+/* prindem butonul icon-only din toolbar (ăla cu SVG) */
+header[data-testid="stHeader"] div[data-testid="stToolbar"] button:has(svg),
+header[data-testid="stHeader"] div[data-testid="stToolbar"] [role="button"]:has(svg){
+  position: relative !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+
+  background: rgba(15,23,42,0.45) !important;     /* glass */
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* ascundem TOT conținutul intern (inclusiv pătratul alb) */
+header[data-testid="stHeader"] div[data-testid="stToolbar"] button:has(svg) > *,
+header[data-testid="stHeader"] div[data-testid="stToolbar"] [role="button"]:has(svg) > *{
+  opacity: 0 !important;
+}
+
+/* desenăm noi kebab-ul (3 puncte verticale) */
+header[data-testid="stHeader"] div[data-testid="stToolbar"] button:has(svg)::after,
+header[data-testid="stHeader"] div[data-testid="stToolbar"] [role="button"]:has(svg)::after{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 4px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+  background: rgba(248,250,252,0.95) !important;
+  transform: translate(-50%, -50%) !important;
+
+  /* 3 puncte */
+  box-shadow:
+    0 -8px 0 rgba(248,250,252,0.95),
+    0  8px 0 rgba(248,250,252,0.95) !important;
+}
+
+/* hover premium */
+header[data-testid="stHeader"] div[data-testid="stToolbar"] button:has(svg):hover,
+header[data-testid="stHeader"] div[data-testid="stToolbar"] [role="button"]:has(svg):hover{
+  background: rgba(15,23,42,0.65) !important;
+  border-color: rgba(34,197,94,0.45) !important;
+}
+</style>
+"""
+
+GLASS_ALWAYS_CSS = """
+<style>
+/* ===== GLASS ALWAYS (no more white bars, no hover-only) ===== */
+:root{
+  --glass-bg: rgba(15,23,42,0.42);
+  --glass-bg2: rgba(15,23,42,0.60);
+  --glass-border: rgba(148,163,184,0.18);
+  --glass-text: rgba(248,250,252,0.95);
+  --glass-muted: rgba(203,213,225,0.80);
+  --glass-accent: rgba(34,197,94,0.45);
+}
+
+/* Scope: aplică pe conținut + sidebar (nu pe portal popovers) */
+[data-testid="stAppViewContainer"],
+[data-testid="stSidebar"]{
+  color: var(--glass-text) !important;
+}
+
+/* ---------- PHASE 1: RESET (neutralize white skins) ---------- */
+/* Anulează “white tiles” puse de module (emp-wrap etc) */
+[data-testid="stAppViewContainer"] .stTextInput input,
+[data-testid="stAppViewContainer"] .stSelectbox div,
+[data-testid="stAppViewContainer"] .stMultiSelect div,
+[data-testid="stSidebar"] .stTextInput input,
+[data-testid="stSidebar"] .stSelectbox div,
+[data-testid="stSidebar"] .stMultiSelect div{
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ---------- PHASE 2: GLASS (always visible, not only hover) ---------- */
+/* Inputs / selects / textareas (BaseWeb wrappers) */
+[data-testid="stAppViewContainer"] div[data-baseweb="input"] > div,
+[data-testid="stAppViewContainer"] div[data-baseweb="base-input"] > div,
+[data-testid="stAppViewContainer"] div[data-baseweb="textarea"] > div,
+[data-testid="stAppViewContainer"] div[data-baseweb="select"] > div,
+[data-testid="stSidebar"] div[data-baseweb="input"] > div,
+[data-testid="stSidebar"] div[data-baseweb="base-input"] > div,
+[data-testid="stSidebar"] div[data-baseweb="textarea"] > div,
+[data-testid="stSidebar"] div[data-baseweb="select"] > div{
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* Nu vrem “devine transparent doar pe hover” — hover rămâne glass, puțin mai solid */
+[data-testid="stAppViewContainer"] div[data-baseweb="input"] > div:hover,
+[data-testid="stAppViewContainer"] div[data-baseweb="base-input"] > div:hover,
+[data-testid="stAppViewContainer"] div[data-baseweb="textarea"] > div:hover,
+[data-testid="stAppViewContainer"] div[data-baseweb="select"] > div:hover,
+[data-testid="stSidebar"] div[data-baseweb="input"] > div:hover,
+[data-testid="stSidebar"] div[data-baseweb="base-input"] > div:hover,
+[data-testid="stSidebar"] div[data-baseweb="textarea"] > div:hover,
+[data-testid="stSidebar"] div[data-baseweb="select"] > div:hover{
+  background: var(--glass-bg2) !important;
+}
+
+/* input/textarea text */
+[data-testid="stAppViewContainer"] input,
+[data-testid="stAppViewContainer"] textarea,
+[data-testid="stSidebar"] input,
+[data-testid="stSidebar"] textarea{
+  background: transparent !important;
+  color: var(--glass-text) !important;
+  caret-color: var(--glass-text) !important;
+}
+
+/* placeholder lizibil */
+[data-testid="stAppViewContainer"] input::placeholder,
+[data-testid="stAppViewContainer"] textarea::placeholder,
+[data-testid="stSidebar"] input::placeholder,
+[data-testid="stSidebar"] textarea::placeholder{
+  color: var(--glass-muted) !important;
+  opacity: 1 !important;
+}
+
+/* focus */
+[data-testid="stAppViewContainer"] div[data-baseweb="input"] > div:focus-within,
+[data-testid="stAppViewContainer"] div[data-baseweb="base-input"] > div:focus-within,
+[data-testid="stAppViewContainer"] div[data-baseweb="textarea"] > div:focus-within,
+[data-testid="stAppViewContainer"] div[data-baseweb="select"] > div:focus-within{
+  border-color: var(--glass-accent) !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.14) !important;
+}
+
+/* Form submit buttons + normal buttons: glass always (nu doar hover) */
+[data-testid="stAppViewContainer"] div[data-testid="stFormSubmitButton"] button,
+[data-testid="stAppViewContainer"] .stButton > button,
+[data-testid="stSidebar"] .stButton > button{
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--glass-text) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+[data-testid="stAppViewContainer"] div[data-testid="stFormSubmitButton"] button:hover,
+[data-testid="stAppViewContainer"] .stButton > button:hover,
+[data-testid="stSidebar"] .stButton > button:hover{
+  background: var(--glass-bg2) !important;
+  border-color: var(--glass-accent) !important;
+}
+
+/* Download buttons (Exportă) – glass, fără fundal alb */
+[data-testid="stAppViewContainer"] .stDownloadButton > button,
+[data-testid="stSidebar"] .stDownloadButton > button,
+[data-testid="stAppViewContainer"] div[data-testid="stDownloadButton"] button,
+[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button{
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--glass-text) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+[data-testid="stAppViewContainer"] .stDownloadButton > button:hover,
+[data-testid="stSidebar"] .stDownloadButton > button:hover,
+[data-testid="stAppViewContainer"] div[data-testid="stDownloadButton"] button:hover,
+[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button:hover{
+  background: var(--glass-bg2) !important;
+  border-color: var(--glass-accent) !important;
+}
+
+/* Link buttons (ex. 🚀 Deschide Pontaj) – glass, nu alb */
+[data-testid="stAppViewContainer"] .stLinkButton > a,
+[data-testid="stSidebar"] .stLinkButton > a,
+[data-testid="stAppViewContainer"] div[data-testid="stLinkButton"] > a,
+[data-testid="stSidebar"] div[data-testid="stLinkButton"] > a{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--glass-text) !important;
+  border-radius: 999px !important;
+  padding: 0.5rem 1rem !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+[data-testid="stAppViewContainer"] .stLinkButton > a:hover,
+[data-testid="stSidebar"] .stLinkButton > a:hover,
+[data-testid="stAppViewContainer"] div[data-testid="stLinkButton"] > a:hover,
+[data-testid="stSidebar"] div[data-testid="stLinkButton"] > a:hover{
+  background: var(--glass-bg2) !important;
+  border-color: var(--glass-accent) !important;
+}
+
+/* Data editor (tabele de editare, ex. Stat de funcții) – fundal mai deschis, font închis */
+[data-testid="stAppViewContainer"] .stDataFrame table,
+[data-testid="stAppViewContainer"] .stDataFrame tbody tr,
+[data-testid="stAppViewContainer"] .stDataFrame tbody td,
+[data-testid="stAppViewContainer"] .stDataFrame thead th{
+  background: #E5E7EB !important;          /* fundal deschis, tip “foaie de calcul” */
+  color: #0B1220 !important;               /* text închis pentru lizibilitate */
+}
+[data-testid="stAppViewContainer"] .stDataFrame tbody tr:nth-child(even) td{
+  background: #CBD5E1 !important;          /* bandare discretă pe rânduri */
+}
+
+/* Expanders: summary bar să fie glass (nu alb) */
+[data-testid="stAppViewContainer"] div[data-testid="stExpander"] summary{
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 14px !important;
+  color: var(--glass-text) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* Card-uri / benzi făcute din div-uri custom în theme.css */
+.emp-card, .home-hero, .home-block, .dosar-card, .org-card, .stat-card{
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* ===== Fix FINAL: kebab / Main menu button să NU mai fie alb ===== */
+
+/* prinde butonul "..." indiferent cum e etichetat */
+div[data-testid="stToolbar"] button[aria-label="Main menu"],
+div[data-testid="stToolbar"] button[title="Main menu"],
+div[data-testid="stToolbar"] button[aria-haspopup="menu"],
+div[data-testid="stToolbar"] [role="button"][aria-label="Main menu"],
+div[data-testid="stToolbar"] [role="button"][aria-haspopup="menu"]{
+  background: rgba(15,23,42,0.45) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* "ciocan": orice copil intern să nu mai aibă background alb */
+div[data-testid="stToolbar"] button[aria-label="Main menu"] *,
+div[data-testid="stToolbar"] button[title="Main menu"] *,
+div[data-testid="stToolbar"] button[aria-haspopup="menu"] *,
+div[data-testid="stToolbar"] [role="button"][aria-label="Main menu"] *,
+div[data-testid="stToolbar"] [role="button"][aria-haspopup="menu"] *{
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* dacă pătratul alb vine din SVG rect / shape */
+div[data-testid="stToolbar"] button[aria-label="Main menu"] svg rect,
+div[data-testid="stToolbar"] button[title="Main menu"] svg rect,
+div[data-testid="stToolbar"] button[aria-haspopup="menu"] svg rect{
+  fill: transparent !important;
+}
+
+/* icon-ul (cele 3 puncte) să fie alb */
+div[data-testid="stToolbar"] button[aria-label="Main menu"] svg,
+div[data-testid="stToolbar"] button[title="Main menu"] svg,
+div[data-testid="stToolbar"] button[aria-haspopup="menu"] svg,
+div[data-testid="stToolbar"] button[aria-label="Main menu"] svg *,
+div[data-testid="stToolbar"] button[title="Main menu"] svg *,
+div[data-testid="stToolbar"] button[aria-haspopup="menu"] svg *{
+  fill: rgba(248,250,252,0.95) !important;
+  stroke: rgba(248,250,252,0.95) !important;
+  color: rgba(248,250,252,0.95) !important;
+}
+
+/* hover premium */
+div[data-testid="stToolbar"] button[aria-label="Main menu"]:hover,
+div[data-testid="stToolbar"] button[title="Main menu"]:hover,
+div[data-testid="stToolbar"] button[aria-haspopup="menu"]:hover{
+  background: rgba(15,23,42,0.65) !important;
+  border-color: rgba(34,197,94,0.45) !important;
+}
+
+/* fallback: dacă există inline style="background:#fff" pe vreun copil intern */
+div[data-testid="stToolbar"] button[aria-haspopup="menu"] [style*="background"]{
+  background: transparent !important;
+  background-color: transparent !important;
 }
 </style>
 """
@@ -455,19 +1092,19 @@ div[data-testid="stTextInput"] [data-baseweb*="input"] > div > div {
   border-radius: 14px !important;
 }
 
-/* input efectiv */
+/* input efectiv – text clar, alb */
 div[data-testid="stTextInput"] input {
   background: #0B1220 !important;
-  color: #F8FAFC !important;
+  color: #F8FAFC !important;          /* text alb în casetă */
   caret-color: #F8FAFC !important;
   border: 0 !important;
   box-shadow: none !important;
 }
 
-/* placeholder */
+/* placeholder – tot deschis, nu gri prăfuit */
 div[data-testid="stTextInput"] input::placeholder {
-  color: #CBD5E1 !important;
-  opacity: 1 !important;
+  color: #F8FAFC !important;
+  opacity: 0.7 !important;
 }
 
 /* autofill */
@@ -494,8 +1131,112 @@ div[data-testid="stTextInput"] svg {
   color: #F8FAFC !important;
   fill: #F8FAFC !important;
 }
+
+/* override explicit pentru login (în interiorul .login-wrap) – culoare foarte vizibilă */
+.login-wrap .stTextInput input,
+.login-wrap input[type="text"],
+.login-wrap input[type="password"]{
+  color: #22C55E !important;              /* verde accent, foarte vizibil */
+  caret-color: #22C55E !important;
+  font-weight: 600 !important;
+}
+.login-wrap .stTextInput input::placeholder,
+.login-wrap input[type="text"]::placeholder,
+.login-wrap input[type="password"]::placeholder{
+  color: #4ADE80 !important;              /* verde mai deschis pentru placeholder */
+  opacity: 1 !important;
+}
 </style>
 """
+
+DASHBOARD_PATCH_CSS = """
+<style>
+:root{
+  color-scheme: dark !important;
+  --bg: #070B12;
+  --surface: #0B1220;
+  --surface2: #0F172A;
+  --border: #263244;
+  --text: #F8FAFC;
+  --muted: #CBD5E1;
+  --muted2: #94A3B8;
+  --accent: rgba(34,197,94,0.55);
+}
+
+/* 1) Headings clare (Scurtături inclus) */
+h1,h2,h3,h4 { color: var(--text) !important; opacity: 1 !important; }
+[data-testid="stMarkdownContainer"] * { opacity: 1 !important; }
+
+/* 2) Text secundar lizibil */
+[data-testid="stCaptionContainer"] *,
+small, .stMarkdown p, .stMarkdown span {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+/* 3) Dacă există paneluri “glass” cu opacity, forțăm să NU afecteze textul */
+.glass, .glass-card, .glass-panel, .card, .panel {
+  opacity: 1 !important;
+}
+
+/* 4) QUICK SEARCH: capsulă unitară, o singură culoare, fără borduri vizibile */
+.home-section div[data-testid="stTextInput"]:has(input[aria-label*="Căutare"]) [data-baseweb*="input"],
+.home-section div[data-testid="stTextInput"]:has(input[aria-label*="Căutare"]) [data-baseweb*="base-input"] {
+  background: var(--surface) !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+.home-section div[data-testid="stTextInput"]:has(input[aria-label*="Căutare"]) [data-baseweb*="input"] > div,
+.home-section div[data-testid="stTextInput"]:has(input[aria-label*="Căutare"]) [data-baseweb*="input"] * {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.home-section div[data-testid="stTextInput"] input[aria-label*="Căutare"] {
+  background: transparent !important;
+  color: var(--text) !important;
+  caret-color: var(--text) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.home-section div[data-testid="stTextInput"] input[aria-label*="Căutare"]::placeholder{
+  color: var(--muted2) !important;
+  opacity: 1 !important;
+}
+
+/* autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text) !important;
+  box-shadow: 0 0 0px 1000px var(--surface) inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* focus */
+div[data-testid="stTextInput"] [data-baseweb*="input"] > div:focus-within{
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.15) !important;
+}
+
+/* 5) Butoane coerente (Scurtături + Caută/Curață) */
+.stButton button{
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.stButton button:hover{
+  border-color: var(--accent) !important;
+}
+</style>
+"""
+
+DEBUG_CSS = "body{outline:6px solid red !important;}"
+# inject_css(DEBUG_CSS)  # activează 1 run, apoi comentează
 
 
 def apply_app_theme():
@@ -508,11 +1249,21 @@ def apply_login_fix():
     st.markdown(LOGIN_FORCE_INPUTS_CSS, unsafe_allow_html=True)
 
 
+def apply_dashboard_patch() -> None:
+    inject_css(DASHBOARD_PATCH_CSS)
+
+
 def apply_force_dark_ui() -> None:
     st.markdown(FORCE_DARK_CSS, unsafe_allow_html=True)
 
 
-def inject_css():
+def inject_css(css: str | None = None):
+    import streamlit as st
+    # helper pentru injectare directă (debug/patch-uri)
+    if css is not None:
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+        return
+
     css_path = BASE_DIR / "assets" / "theme.css"
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
@@ -558,6 +1309,114 @@ def inject_css():
                 pass
     else:
         st.error(f"CSS file not found: {css_path}")
+
+
+def apply_app_post_render_fix() -> None:
+    import streamlit as st
+    st.markdown(APP_POST_RENDER_CSS, unsafe_allow_html=True)
+
+
+def apply_glass_always():
+    import streamlit as st
+    st.markdown(GLASS_ALWAYS_CSS, unsafe_allow_html=True)
+
+
+def apply_toolbar_runtime_fix():
+    """
+    Fix pentru butonul alb din toolbar (kebab / main menu).
+    CSS-ul nu îl poate bate mereu (inline !important / rerender).
+    Aici îl forțăm din runtime: glass + remove white backgrounds.
+    """
+    import streamlit.components.v1 as components
+
+    components.html(
+        """
+        <script>
+        (function () {
+          const GLASS_BG = 'rgba(15,23,42,0.45)';
+          const BORDER   = '1px solid rgba(148,163,184,0.18)';
+          const TEXT     = 'rgba(248,250,252,0.95)';
+
+          function isWhite(bg) {
+            return bg === 'rgb(255, 255, 255)' || bg === 'rgba(255, 255, 255, 1)';
+          }
+
+          function patchToolbar() {
+            const doc = window.parent?.document || document;
+            const header = doc.querySelector('header[data-testid="stHeader"]');
+            const toolbar = doc.querySelector('div[data-testid="stToolbar"]');
+
+            if (!header || !toolbar) return;
+
+            // 1) Glass pe toate butoanele din toolbar
+            const buttons = toolbar.querySelectorAll('button, [role="button"]');
+            buttons.forEach(btn => {
+              btn.style.setProperty('background', GLASS_BG, 'important');
+              btn.style.setProperty('border', BORDER, 'important');
+              btn.style.setProperty('border-radius', '12px', 'important');
+              btn.style.setProperty('box-shadow', 'none', 'important');
+              btn.style.setProperty('outline', 'none', 'important');
+              btn.style.setProperty('color', TEXT, 'important');
+
+              // 2) Orice copil cu background alb (sau inline background) -> transparent
+              btn.querySelectorAll('*').forEach(el => {
+                try {
+                  const cs = getComputedStyle(el);
+                  const bg = cs.backgroundColor;
+
+                  if (isWhite(bg)) {
+                    el.style.setProperty('background', 'transparent', 'important');
+                    el.style.setProperty('background-color', 'transparent', 'important');
+                  }
+
+                  const st = el.getAttribute('style') || '';
+                  if (st.toLowerCase().includes('background')) {
+                    el.style.setProperty('background', 'transparent', 'important');
+                    el.style.setProperty('background-color', 'transparent', 'important');
+                  }
+
+                  if (el.tagName && el.tagName.toLowerCase() === 'rect') {
+                    el.style.setProperty('fill', 'transparent', 'important');
+                  }
+                } catch (e) {}
+              });
+
+              // 3) dacă există SVG: îl facem alb
+              btn.querySelectorAll('svg, svg *').forEach(svgEl => {
+                svgEl.style.setProperty('fill', TEXT, 'important');
+                svgEl.style.setProperty('stroke', TEXT, 'important');
+                svgEl.style.setProperty('color', TEXT, 'important');
+              });
+            });
+
+            // 4) Extra: caută în toolbar orice element mic (<= 44px) cu background alb și îl “stinge”
+            toolbar.querySelectorAll('*').forEach(el => {
+              try {
+                const cs = getComputedStyle(el);
+                if (isWhite(cs.backgroundColor) && el.offsetWidth <= 44 && el.offsetHeight <= 44) {
+                  el.style.setProperty('background', 'transparent', 'important');
+                  el.style.setProperty('background-color', 'transparent', 'important');
+                }
+              } catch (e) {}
+            });
+          }
+
+          // Patch imediat
+          patchToolbar();
+
+          // Repatch la rerender (Streamlit mai rescrie header-ul)
+          const doc = window.parent?.document || document;
+          const obs = new MutationObserver(() => patchToolbar());
+          obs.observe(doc.documentElement, {subtree:true, childList:true, attributes:true});
+
+          // (opțional) oprește observer după 20s
+          setTimeout(() => { try { obs.disconnect(); } catch(e) {} }, 20000);
+        })();
+        </script>
+        """,
+        height=0,
+        scrolling=False,
+    )
 
 
 DB_PATH_DEFAULT = str(Path(__file__).resolve().parent.parent / "data" / "ANCPI.db")
@@ -655,6 +1514,11 @@ st.set_page_config(page_title="SOCRATES@HR", layout="wide")
 apply_app_theme()
 apply_force_dark_ui()
 inject_css()
+
+# IMPORTANT: asta trebuie să fie ULTIMUL CSS global înainte de bg-glow,
+# ca să nu fie calculat de theme.css sau alte injectări.
+apply_glass_always()
+
 st.markdown('<div class="bg-glow"></div>', unsafe_allow_html=True)
 
 # -------------------------------------------------------------
@@ -2352,9 +3216,9 @@ def page_home(conn, cfg):
     st.markdown('<div class="home-section">', unsafe_allow_html=True)
     st.subheader("🔎 Căutare rapidă")
     q = st.text_input(
-        "Nume / CNP / ID",
-        label_visibility="collapsed",
+        "Căutare rapidă",
         placeholder="Ex: Popescu Ioana / 29xxxxxxxxxxxxx / EMP-1024",
+        label_visibility="collapsed",
         key="home_query",
     )
 
@@ -2406,6 +3270,9 @@ def page_home(conn, cfg):
     with col3:
         action_card("📄 Documente", "Decizii, adeverințe, export.", "Dosar profesional", "go_docs")
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Patch final pentru dashboard (headings + text + input + butoane)
+    apply_dashboard_patch()
 
     st.write("")
 
@@ -4314,6 +5181,8 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
                     st.session_state.logged_in = True
                     st.session_state.user_role = role_or_msg
                     st.session_state.username = (u or "").strip()
+                    # după autentificare, aterizează întotdeauna pe „🏠 Acasă”
+                    st.session_state["main_choice"] = "🏠 Acasă"
                     st.rerun()
                 else:
                     st.error(role_or_msg)
@@ -14831,12 +15700,12 @@ def main():
     )
 
     # Două grupuri: Operațional + Administrativ (navigare prin on_change)
-    OPS = ["🏠 Home", "Angajați", "Organigramă"]
+    OPS = ["🏠 Acasă", "Angajați", "Organigramă"]
     ADM = ["Stat de funcții", "Dosar profesional", "Pontaj", "Configurare"]
 
-    main_choice = st.session_state.get("main_choice", "🏠 Home")
+    main_choice = st.session_state.get("main_choice", "🏠 Acasă")
     if main_choice not in OPS and main_choice not in ADM:
-        main_choice = "🏠 Home"
+        main_choice = "🏠 Acasă"
         st.session_state["main_choice"] = main_choice
     st.session_state.setdefault("main_choice", main_choice)
 
@@ -14869,7 +15738,7 @@ def main():
         on_change=_on_adm_change,
     )
 
-    main_choice = st.session_state.get("main_choice", "🏠 Home")
+    main_choice = st.session_state.get("main_choice", "🏠 Acasă")
 
     if main_choice == "Dosar profesional":
         st.session_state.setdefault(
@@ -14926,7 +15795,7 @@ def main():
 
     st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
-    if main_choice == "🏠 Home":
+    if main_choice == "🏠 Acasă":
         page_home(conn, cfg)
 
     elif main_choice == "Angajați":
@@ -15434,6 +16303,11 @@ def main():
                 "Configurarea a fost salvată. "
                 "La următoarea rulare se va folosi noua bază de date și noile date de unitate."
             )
+
+    # IMPORTANT: ca la login – după ce pagina este randată
+    if st.session_state.get("logged_in", False):
+        apply_app_post_render_fix()
+        apply_toolbar_runtime_fix()
 
 
 if __name__ == "__main__":
