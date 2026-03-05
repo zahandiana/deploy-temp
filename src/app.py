@@ -6700,6 +6700,29 @@ def _render_employee_form_fields(employee: dict, cols: list[str], *, prefix: str
         "profesie": "Profesie",
         "calificare": "Calificare",
         "observatii": "Observații",
+        # Copertă dosar profesional
+        "dosar_nr": "Dosar nr.",
+        "dosar_functionar_public": "Funcționar public",
+        "dosar_data_intocmire": "Data întocmirii dosarului",
+        "dosar_autoritate": "Autoritate emitentă",
+        "dosar_intocmit_nume": "Persoană care a întocmit – nume",
+        "dosar_intocmit_functie": "Persoană care a întocmit – funcție",
+        "dosar_intocmit_semnatura": "Persoană care a întocmit – semnătură",
+        "dosar_modificari_nume": "Persoană modificări – nume",
+        "dosar_modificari_functie": "Persoană modificări – funcție",
+        "dosar_modificari_semnatura": "Persoană modificări – semnătură",
+        "dosar_certificare_nume": "Persoană certificare – nume",
+        "dosar_certificare_functie": "Persoană certificare – funcție",
+        "dosar_certificare_semnatura": "Persoană certificare – semnătură",
+        # Situații & registru
+        "activitate_in_afara_functiei": "Activitate în afara funcției",
+        "activitate_in_cadru_institutie": "Activitate în cadrul instituției",
+        "situatia_drepturi_salariale": "Situația drepturilor salariale",
+        "situatia_concedii": "Situația concediilor",
+        "situatia_disciplinara": "Situația disciplinară",
+        "registru_numar": "Număr în registru",
+        "registru_data": "Data înscrierii în registru",
+        "registru_observatii": "Observații registru",
     }
 
     for gname, gcols in groups:
@@ -6709,7 +6732,12 @@ def _render_employee_form_fields(employee: dict, cols: list[str], *, prefix: str
         toggle = 0
         for c in gcols:
             val = employee.get(c, None)
-            label = labels.get(c, c)
+            # Etichetă: întâi din map-ul dedicat, altfel formatăm automat snake_case -> "Titlu Frumos"
+            if c in labels:
+                label = labels[c]
+            else:
+                parts = [p for p in str(c).split("_") if p]
+                label = " ".join(p.capitalize() for p in parts) if parts else str(c)
             key = f"{prefix}_{c}"
 
             target = colL if toggle % 2 == 0 else colR
@@ -8558,7 +8586,17 @@ def page_angajati(conn: sqlite3.Connection):
                                         else (dob_from_db or datetime.date.today())
                                     )
 
-                                    dob = st.date_input("Data nașterii", value=dob_default, key=f"{K}dob_{counter}")
+                                    import datetime as _dt_dob
+                                    today_dob = _dt_dob.date.today()
+                                    min_dob = today_dob.replace(year=today_dob.year - 100)
+                                    max_dob = today_dob.replace(year=today_dob.year + 10)
+                                    dob = st.date_input(
+                                        "Data nașterii",
+                                        value=dob_default,
+                                        min_value=min_dob,
+                                        max_value=max_dob,
+                                        key=f"{K}dob_{counter}",
+                                    )
 
                             with right:
                                 grad_cur = (current.get("grad_rudenie") or "").strip().upper()
@@ -8791,9 +8829,14 @@ def page_angajati(conn: sqlite3.Connection):
 
                     with col1:
                         _ang_default = _parse_date_any(data_angaj) or datetime.date.today()
+                        _today = datetime.date.today()
+                        _min_d = _today.replace(year=_today.year - 100)
+                        _max_d = _today.replace(year=_today.year + 10)
                         data_ang_date = st.date_input(
                             "Data angajării",
                             value=_ang_default,
+                            min_value=_min_d,
+                            max_value=_max_d,
                             key=f"data_ang_date_{emp_id}",
                         )
 
@@ -8809,6 +8852,8 @@ def page_angajati(conn: sqlite3.Connection):
                         data_plec_date = st.date_input(
                             "Data plecării",
                             value=_plec_default,
+                            min_value=_min_d,
+                            max_value=_max_d,
                             disabled=still_active,
                             key=f"data_plec_date_{emp_id}",
                         )
@@ -9705,8 +9750,23 @@ def page_angajati(conn: sqlite3.Connection):
                         st.text_input("Tip handicap (NUME)", value=tip_name, disabled=True, key=f"reg_tip_name_{emp_id}")
 
                         nr_cert_in = st.text_input("Număr certificat handicap", value=nr_cert, key=f"reg_nr_cert_{emp_id}")
-                        dc = st.date_input("Data certificat handicap", value=d_cert or datetime.date.today(), key=f"reg_d_cert_{emp_id}")
-                        dv = st.date_input("Termen de valabilitate", value=d_val or dc, key=f"reg_d_val_{emp_id}")
+                        _today_reg = datetime.date.today()
+                        _min_reg = _today_reg.replace(year=_today_reg.year - 100)
+                        _max_reg = _today_reg.replace(year=_today_reg.year + 10)
+                        dc = st.date_input(
+                            "Data certificat handicap",
+                            value=d_cert or _today_reg,
+                            min_value=_min_reg,
+                            max_value=_max_reg,
+                            key=f"reg_d_cert_{emp_id}",
+                        )
+                        dv = st.date_input(
+                            "Termen de valabilitate",
+                            value=d_val or dc,
+                            min_value=_min_reg,
+                            max_value=_max_reg,
+                            key=f"reg_d_val_{emp_id}",
+                        )
 
                     bs, bc = st.columns([1,1])
                     with bs:
@@ -10018,9 +10078,14 @@ def page_angajati(conn: sqlite3.Connection):
                         with b2:
                             st.text_input("Coeficient (auto)", value=str(c_val), key=f"{KGRID}coef", disabled=True)
 
+                        _today_l153 = datetime.date.today()
+                        _min_l153 = _today_l153.replace(year=_today_l153.year - 100)
+                        _max_l153 = _today_l153.replace(year=_today_l153.year + 10)
                         data_apl = st.date_input(
                             "Data aplicării (de la)",
-                            value=datetime.date.today(),
+                            value=_today_l153,
+                            min_value=_min_l153,
+                            max_value=_max_l153,
                             key=f"{KGRID}data_apl",
                         )
 
@@ -10758,21 +10823,20 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
     # --------- SUS: FILTRE + LISTĂ ANGAJAȚI ---------
     st.markdown("#### Filtru angajați")
 
-    f_nume, f_prenume, f_cnp, f_marca, f_activ = st.columns([2, 2, 2, 2, 1])
-    with f_nume:
+    # Nume/Prenume pe aceeași coloană, CNP/Marcă pe a doua
+    col_name, col_id = st.columns(2)
+    with col_name:
         filter_nume = st.text_input("Nume", key="filter_nume")
-    with f_prenume:
         filter_prenume = st.text_input("Prenume", key="filter_prenume")
-    with f_cnp:
+    with col_id:
         filter_cnp = st.text_input("CNP", key="filter_cnp")
-    with f_marca:
         filter_marca = st.text_input("Marcă", key="filter_marca")
-    with f_activ:
-        active_only = st.checkbox(
-            "Doar activi",
-            value=True,
-            key="emp_active_only",
-        )
+    # Checkbox-ul sub filtre, pe un rând separat
+    active_only = st.checkbox(
+        "Doar activi",
+        value=True,
+        key="emp_active_only",
+    )
 
     employees_df = list_employees(
         conn,
@@ -10840,36 +10904,49 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
     with st.expander("Formular angajat nou", expanded=False):
         new = {}
-        new["marca"] = st.text_input("Marcă", key="new_marca")
-        new["last_name"] = st.text_input("Nume", key="new_last_name")
-        new["first_name"] = st.text_input("Prenume", key="new_first_name")
-        new["cnp"] = st.text_input("CNP", key="new_cnp")
+        # Identificare de bază (2 coloane)
+        c_id1, c_id2 = st.columns(2)
+        with c_id1:
+            new["marca"] = st.text_input("Marcă", key="new_marca")
+            new["last_name"] = st.text_input("Nume", key="new_last_name")
+        with c_id2:
+            new["first_name"] = st.text_input("Prenume", key="new_first_name")
+            new["cnp"] = st.text_input("CNP", key="new_cnp")
 
         st.markdown("**Contact**")
-        new["telefon_fix"] = st.text_input("Telefon fix", key="new_telefon_fix")
-        new["mobil"] = st.text_input("Telefon mobil", key="new_mobil")
-        new["email"] = st.text_input("Email", key="new_email")
+        c_contact1, c_contact2 = st.columns(2)
+        with c_contact1:
+            new["telefon_fix"] = st.text_input("Telefon fix", key="new_telefon_fix")
+            new["mobil"] = st.text_input("Telefon mobil", key="new_mobil")
+        with c_contact2:
+            new["email"] = st.text_input("Email", key="new_email")
 
         st.markdown("**Adresă**")
-        new["strada"] = st.text_input("Strada", key="new_strada")
-        new["numar"] = st.text_input("Număr", key="new_numar")
-        new["bloc"] = st.text_input("Bloc", key="new_bloc")
-        new["scara"] = st.text_input("Scară", key="new_scara")
-        new["apartament"] = st.text_input("Apartament", key="new_apartament")
-        new["cod_postal"] = st.text_input("Cod poștal", key="new_cod_postal")
-        new["localitate"] = st.text_input("Localitate", key="new_localitate")
-        new["judet"] = st.text_input("Județ", key="new_judet")
+        c_addr1, c_addr2 = st.columns(2)
+        with c_addr1:
+            new["strada"] = st.text_input("Strada", key="new_strada")
+            new["numar"] = st.text_input("Număr", key="new_numar")
+            new["bloc"] = st.text_input("Bloc", key="new_bloc")
+            new["scara"] = st.text_input("Scară", key="new_scara")
+        with c_addr2:
+            new["apartament"] = st.text_input("Apartament", key="new_apartament")
+            new["cod_postal"] = st.text_input("Cod poștal", key="new_cod_postal")
+            new["localitate"] = st.text_input("Localitate", key="new_localitate")
+            new["judet"] = st.text_input("Județ", key="new_judet")
 
         st.markdown("**Contract (scurt)**")
-        new["functie"] = st.text_input("Funcție", key="new_functie")
-        new["departament"] = st.text_input("Departament", key="new_departament")
-        new["data_angajare"] = st.text_input(
-            "Data angajare (YYYY-MM-DD)", key="new_data_angajare"
-        )
-        new["tip_contract"] = st.text_input("Tip contract", key="new_tip_contract")
-        new["salariu_baza"] = st.number_input(
-            "Salariu de bază", min_value=0.0, step=1.0, key="new_salariu_baza"
-        )
+        c_ctr1, c_ctr2 = st.columns(2)
+        with c_ctr1:
+            new["functie"] = st.text_input("Funcție", key="new_functie")
+            new["departament"] = st.text_input("Departament", key="new_departament")
+            new["data_angajare"] = st.text_input(
+                "Data angajare (YYYY-MM-DD)", key="new_data_angajare"
+            )
+        with c_ctr2:
+            new["tip_contract"] = st.text_input("Tip contract", key="new_tip_contract")
+            new["salariu_baza"] = st.number_input(
+                "Salariu de bază", min_value=0.0, step=1.0, key="new_salariu_baza"
+            )
 
         st.markdown("**Studii / Observații**")
         new["studii"] = st.text_area("Studii", key="new_studii")
@@ -10916,8 +10993,38 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
         new["activ"] = 1
 
         if st.button("Salvează angajat nou", key="btn_save_new_emp"):
+            import re as _re
+
+            errors: list[str] = []
+
+            # Validări simple: doar litere / doar cifre
+            def _only_letters(val: str, label: str):
+                txt = (val or "").strip()
+                if not txt:
+                    return
+                if not _re.fullmatch(r"[A-Za-zĂÂÎȘŞȚŢăâîșşțţ \-]+", txt):
+                    errors.append(f"{label} trebuie să conțină doar litere.")
+
+            def _only_digits(val: str, label: str):
+                txt = (val or "").strip()
+                if not txt:
+                    return
+                if not txt.isdigit():
+                    errors.append(f"{label} trebuie să conțină doar cifre.")
+
+            _only_letters(new["last_name"], "Nume")
+            _only_letters(new["first_name"], "Prenume")
+
+            _only_digits(new["numar"], "Număr")
+            _only_digits(new["bloc"], "Bloc")
+            _only_digits(new["cod_postal"], "Cod poștal")
+
             if not new["last_name"] or not new["first_name"]:
-                st.error("Completează cel puțin Nume și Prenume.")
+                errors.append("Completează cel puțin Nume și Prenume.")
+
+            if errors:
+                for msg in errors:
+                    st.error(msg)
             else:
                 emp_id_new = insert_employee(conn, new)
                 st.success(f"Angajat nou salvat (ID = {emp_id_new}).")
@@ -11059,19 +11166,19 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
                 with col_n1:
                     n = st.text_input(
-                        "NUMELE ȘI PRENUMELE" if i == 0 else "",
+                        f"Nume și prenume persoana {i + 1}",
                         value=nume_val,
                         key=f"{key_prefix}intocmit_nume_{i}",
                     )
                 with col_f1:
                     f = st.text_input(
-                        "FUNCȚIA" if i == 0 else "",
+                        f"Funcția persoana {i + 1}",
                         value=functie_val,
                         key=f"{key_prefix}intocmit_functie_{i}",
                     )
                 with col_s1:
                     s = st.text_input(
-                        "SEMNĂTURA" if i == 0 else "",
+                        f"Semnătura persoana {i + 1}",
                         value=semn_val,
                         key=f"{key_prefix}intocmit_semnatura_{i}",
                     )
@@ -11122,19 +11229,19 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
                 with col_n2:
                     n = st.text_input(
-                        "NUMELE ȘI PRENUMELE" if i == 0 else "",
+                        f"Nume și prenume persoana {i + 1}",
                         value=nume_val,
                         key=f"{key_prefix}modif_nume_{i}",
                     )
                 with col_f2:
                     f = st.text_input(
-                        "FUNCȚIA" if i == 0 else "",
+                        f"Funcția persoana {i + 1}",
                         value=functie_val,
                         key=f"{key_prefix}modif_functie_{i}",
                     )
                 with col_s2:
                     s = st.text_input(
-                        "SEMNĂTURA" if i == 0 else "",
+                        f"Semnătura persoana {i + 1}",
                         value=semn_val,
                         key=f"{key_prefix}modif_semnatura_{i}",
                     )
@@ -11185,19 +11292,19 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
                 with col_n3:
                     n = st.text_input(
-                        "NUMELE ȘI PRENUMELE" if i == 0 else "",
+                        f"Nume și prenume persoana {i + 1}",
                         value=nume_val,
                         key=f"{key_prefix}cert_nume_{i}",
                     )
                 with col_f3:
                     f = st.text_input(
-                        "FUNCȚIA" if i == 0 else "",
+                        f"Funcția persoana {i + 1}",
                         value=functie_val,
                         key=f"{key_prefix}cert_functie_{i}",
                     )
                 with col_s3:
                     s = st.text_input(
-                        "SEMNĂTURA" if i == 0 else "",
+                        f"Semnătura persoana {i + 1}",
                         value=semn_val,
                         key=f"{key_prefix}cert_semnatura_{i}",
                     )
@@ -11323,9 +11430,10 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
     elif sub_menu == "Date cu caracter personal":
         st.markdown("#### Date cu caracter personal")
 
-        col1, col2, col3 = st.columns(3)
+        # Layout pe 2 coloane, simetric: stânga = date personale, dreapta = adresă + localizare
+        col_left, col_right = st.columns(2)
 
-        with col1:
+        with col_left:
             last_name = st.text_input(
                 "Nume",
                 value=get_val(emp_dosar, "last_name", "LAST_NAME", "nume", "NUME"),
@@ -11357,55 +11465,6 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
                 key=f"{key_prefix}dp_nr_copii",
             )
 
-        with col2:
-            strada = st.text_input(
-                "Strada",
-                value=get_val(emp_dosar, "strada"),
-                key=f"{key_prefix}dp_strada",
-            )
-
-            numar = st.text_input(
-                "Număr",
-                value=get_val(emp_dosar, "numar"),
-                key=f"{key_prefix}dp_numar",
-            )
-
-            bloc = st.text_input(
-                "Bloc",
-                value=get_val(emp_dosar, "bloc"),
-                key=f"{key_prefix}dp_bloc",
-            )
-
-            scara = st.text_input(
-                "Scară",
-                value=get_val(emp_dosar, "scara"),
-                key=f"{key_prefix}dp_scara",
-            )
-
-            apartament = st.text_input(
-                "Apartament",
-                value=get_val(emp_dosar, "apartament"),
-                key=f"{key_prefix}dp_apartament",
-            )
-
-        with col3:
-            cod_postal = st.text_input(
-                "Cod poștal",
-                value=get_val(emp_dosar, "cod_postal"),
-                key=f"{key_prefix}dp_cod_postal",
-            )
-
-            localitate = st.text_input(
-                "Localitate",
-                value=get_val(emp_dosar, "localitate"),
-                key=f"{key_prefix}dp_localitate",
-            )
-
-            judet = st.text_input(
-                "Județ",
-                value=get_val(emp_dosar, "judet"),
-                key=f"{key_prefix}dp_judet",
-            )
             telefon_fix = st.text_input(
                 "Telefon fix",
                 value=get_val(emp_dosar, "telefon_fix"),
@@ -11422,10 +11481,52 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
                 key=f"{key_prefix}dp_email",
             )
 
+        with col_right:
+            strada = st.text_input(
+                "Strada",
+                value=get_val(emp_dosar, "strada"),
+                key=f"{key_prefix}dp_strada",
+            )
+            numar = st.text_input(
+                "Număr",
+                value=get_val(emp_dosar, "numar"),
+                key=f"{key_prefix}dp_numar",
+            )
+            bloc = st.text_input(
+                "Bloc",
+                value=get_val(emp_dosar, "bloc"),
+                key=f"{key_prefix}dp_bloc",
+            )
+            scara = st.text_input(
+                "Scară",
+                value=get_val(emp_dosar, "scara"),
+                key=f"{key_prefix}dp_scara",
+            )
+            apartament = st.text_input(
+                "Apartament",
+                value=get_val(emp_dosar, "apartament"),
+                key=f"{key_prefix}dp_apartament",
+            )
+            cod_postal = st.text_input(
+                "Cod poștal",
+                value=get_val(emp_dosar, "cod_postal"),
+                key=f"{key_prefix}dp_cod_postal",
+            )
+            localitate = st.text_input(
+                "Localitate",
+                value=get_val(emp_dosar, "localitate"),
+                key=f"{key_prefix}dp_localitate",
+            )
+            judet = st.text_input(
+                "Județ",
+                value=get_val(emp_dosar, "judet"),
+                key=f"{key_prefix}dp_judet",
+            )
+
         st.markdown("##### Date act identitate")
 
-        ci_col1, ci_col2, ci_col3 = st.columns(3)
-        with ci_col1:
+        ci_col_left, ci_col_right = st.columns(2)
+        with ci_col_left:
             ci_tip_act = st.text_input(
                 "Tip act (CI/BI/Pașaport)",
                 value=get_val(emp_dosar, "ci_tip_act"),
@@ -11436,18 +11537,17 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
                 value=get_val(emp_dosar, "ci_serie"),
                 key=f"{key_prefix}dp_ci_serie",
             )
-        with ci_col2:
             ci_numar = st.text_input(
                 "Număr",
                 value=get_val(emp_dosar, "ci_numar"),
                 key=f"{key_prefix}dp_ci_numar",
             )
+        with ci_col_right:
             ci_eliberat_de = st.text_input(
                 "Eliberat de",
                 value=get_val(emp_dosar, "ci_eliberat_de"),
                 key=f"{key_prefix}dp_ci_eliberat_de",
             )
-        with ci_col3:
             ci_data_eliberarii = st.text_input(
                 "Data eliberării",
                 value=get_val(emp_dosar, "ci_data_eliberarii"),
@@ -11455,66 +11555,71 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
             )
 
         st.markdown("---")
-        if st.button(
-            "💾 Salvează datele cu caracter personal",
-            key=f"{key_prefix}btn_save_date_pers",
-        ):
-            cur = conn.cursor()
-            cur.execute(
-                """
-                UPDATE employees
-                SET last_name = ?,
-                    first_name = ?,
-                    cnp = ?,
-                    stare_civila = ?,
-                    nr_copii = ?,
-                    strada = ?,
-                    numar = ?,
-                    bloc = ?,
-                    scara = ?,
-                    apartament = ?,
-                    cod_postal = ?,
-                    localitate = ?,
-                    judet = ?,
-                    telefon_fix = ?,
-                    mobil = ?,
-                    email = ?,
-                    ci_tip_act = ?,
-                    ci_serie = ?,
-                    ci_numar = ?,
-                    ci_eliberat_de = ?,
-                    ci_data_eliberarii = ?
-                WHERE id = ?
-                """,
-                (
-                    last_name,
-                    first_name,
-                    cnp_val,
-                    stare_civila,
-                    int(nr_copii),
-                    strada,
-                    numar,
-                    bloc,
-                    scara,
-                    apartament,
-                    cod_postal,
-                    localitate,
-                    judet,
-                    telefon_fix,
-                    mobil,
-                    email,
-                    ci_tip_act,
-                    ci_serie,
-                    ci_numar,
-                    ci_eliberat_de,
-                    ci_data_eliberarii,
-                    emp_id,
-                ),
-            )
-            conn.commit()
-            st.success("Datele cu caracter personal au fost salvate.")
 
-        # Export Word pentru secțiune
+        # Grupare acțiuni formular: Salvează + Export secțiune pe același rând
+        act_col1, act_col2 = st.columns([0.4, 0.6])
+
+        with act_col1:
+            if st.button(
+                "💾 Salvează datele cu caracter personal",
+                key=f"{key_prefix}btn_save_date_pers",
+            ):
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    UPDATE employees
+                    SET last_name = ?,
+                        first_name = ?,
+                        cnp = ?,
+                        stare_civila = ?,
+                        nr_copii = ?,
+                        strada = ?,
+                        numar = ?,
+                        bloc = ?,
+                        scara = ?,
+                        apartament = ?,
+                        cod_postal = ?,
+                        localitate = ?,
+                        judet = ?,
+                        telefon_fix = ?,
+                        mobil = ?,
+                        email = ?,
+                        ci_tip_act = ?,
+                        ci_serie = ?,
+                        ci_numar = ?,
+                        ci_eliberat_de = ?,
+                        ci_data_eliberarii = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        last_name,
+                        first_name,
+                        cnp_val,
+                        stare_civila,
+                        int(nr_copii),
+                        strada,
+                        numar,
+                        bloc,
+                        scara,
+                        apartament,
+                        cod_postal,
+                        localitate,
+                        judet,
+                        telefon_fix,
+                        mobil,
+                        email,
+                        ci_tip_act,
+                        ci_serie,
+                        ci_numar,
+                        ci_eliberat_de,
+                        ci_data_eliberarii,
+                        emp_id,
+                    ),
+                )
+                conn.commit()
+                st.success("Datele cu caracter personal au fost salvate.")
+
+        # Export Word pentru secțiune (în coloana a doua)
         emp_export = dict(emp_dosar)
         emp_export.update(
             {
@@ -11546,13 +11651,14 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
             f"dosar_date_personale_{get_val(emp_export, 'cnp', 'CNP') or emp_id}.docx"
         )
 
-        st.download_button(
-            "⬇️ Exportă secțiunea în Word",
-            data=sec_docx,
-            file_name=sec_name,
-            mime=(mimetypes.guess_type(sec_name)[0] or "application/octet-stream"),
-                key=f"{key_prefix}btn_export_date_pers_docx",
-        )
+        with act_col2:
+            st.download_button(
+                "⬇️ Exportă secțiunea în Word",
+                data=sec_docx,
+                file_name=sec_name,
+                mime=(mimetypes.guess_type(sec_name)[0] or "application/octet-stream"),
+                    key=f"{key_prefix}btn_export_date_pers_docx",
+            )
 
     # ------------------ STUDII ------------------
     elif sub_menu == "Studii și pregătire profesională":
@@ -12024,6 +12130,23 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
     # ------------------ ACCESUL LA DOSAR ------------------
     elif sub_menu == "Accesul la dosarul profesional":
+        # marker pentru styling local
+        st.markdown('<span id="dosar-acces-scope"></span>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <style>
+            section.main:has(#dosar-acces-scope) .access-form{
+              max-width: 420px;
+            }
+            section.main:has(#dosar-acces-scope) .access-form input,
+            section.main:has(#dosar-acces-scope) .access-form textarea{
+              max-width: 420px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
         st.markdown("#### Accesul la dosarul profesional")
 
         st.markdown("##### Istoric accesări")
@@ -12038,34 +12161,34 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
 
         st.markdown("##### Adaugă o nouă accesare a dosarului")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            nume_acces = st.text_input(
-                "Numele și prenumele persoanei care accesează dosarul",
-                key=f"{key_prefix}acces_nume",
-            )
-            functie_acces = st.text_input(
-                "Funcția persoanei care accesează dosarul",
-                key=f"{key_prefix}acces_functie",
-            )
-            semnatura_acces = st.text_input(
-                "Semnătura persoanei care accesează",
-                key=f"{key_prefix}acces_semnatura",
-            )
-        with col2:
-            motiv_acces = st.text_area(
-                "Motivul accesării dosarului",
-                key=f"{key_prefix}acces_motiv",
-            )
-            autorizat_de = st.text_input(
-                "Acces autorizat de (nume și funcție)",
-                key=f"{key_prefix}acces_autorizat_de",
-            )
-            luat_la_cunostinta = st.text_input(
-                "Luat la cunoștință (semnătura funcționarului public)",
-                key=f"{key_prefix}acces_luat_la_cunostinta",
-            )
+        # Toate câmpurile pe un singur flux vertical, într-un formular mai îngust
+        st.markdown('<div class="access-form">', unsafe_allow_html=True)
+        nume_acces = st.text_input(
+            "Numele și prenumele persoanei care accesează dosarul",
+            key=f"{key_prefix}acces_nume",
+        )
+        functie_acces = st.text_input(
+            "Funcția persoanei care accesează dosarul",
+            key=f"{key_prefix}acces_functie",
+        )
+        semnatura_acces = st.text_input(
+            "Semnătura persoanei care accesează",
+            key=f"{key_prefix}acces_semnatura",
+        )
+        motiv_acces = st.text_area(
+            "Motivul accesării dosarului",
+            key=f"{key_prefix}acces_motiv",
+        )
+        autorizat_de = st.text_input(
+            "Acces autorizat de (nume și funcție)",
+            key=f"{key_prefix}acces_autorizat_de",
+        )
+        luat_la_cunostinta = st.text_input(
+            "Luat la cunoștință (semnătura funcționarului public)",
+            key=f"{key_prefix}acces_luat_la_cunostinta",
+        )
 
+        # Acțiuni: una sub alta, în ordinea corectă
         if st.button(
             "💾 Înregistrează accesul la dosar",
             key=f"{key_prefix}btn_add_acces",
@@ -12086,7 +12209,7 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
                 st.success("Accesul la dosarul profesional a fost înregistrat.")
                 rows = list_dosar_acces(conn, emp_id)
 
-        # Export Word pentru secțiune
+        # Export Word pentru secțiune (sub butonul de înregistrare)
         rows_for_export = list_dosar_acces(conn, emp_id)
         sec_docx = create_acces_docx(emp_dosar, rows_for_export)
         sec_name = (
@@ -12100,21 +12223,43 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
             mime=(mimetypes.guess_type(sec_name)[0] or "application/octet-stream"),
                 key=f"{key_prefix}btn_export_acces_docx",
         )
+        st.markdown("</div>", unsafe_allow_html=True)  # end .access-form
 
     # ------------------ REGISTRU EVIDENȚĂ ------------------
     elif sub_menu == "Registru evidență funcționari publici":
         st.markdown("#### Registru evidență funcționari publici")
 
-        registru_numar = st.text_input(
-            "Număr în registrul de evidență",
-            value=get_val(emp_dosar, "registru_numar"),
-            key=f"{key_prefix}registru_numar",
-        )
-        registru_data = st.text_input(
-            "Data înscrierii în registru",
-            value=get_val(emp_dosar, "registru_data"),
-            key=f"{key_prefix}registru_data",
-        )
+        # Număr registru și data înscrierii pe același rând
+        reg_col1, reg_col2 = st.columns(2)
+        with reg_col1:
+            registru_numar = st.text_input(
+                "Număr în registrul de evidență",
+                value=get_val(emp_dosar, "registru_numar"),
+                key=f"{key_prefix}registru_numar",
+            )
+        with reg_col2:
+            import datetime as _dt
+
+            _registru_data_raw = get_val(emp_dosar, "registru_data") or ""
+            _default_date = None
+            try:
+                if _registru_data_raw:
+                    _default_date = _dt.datetime.strptime(_registru_data_raw, "%Y-%m-%d").date()
+            except Exception:
+                _default_date = None
+
+            _today = _dt.date.today()
+            _min_date = _today.replace(year=_today.year - 100)
+            _max_date = _today.replace(year=_today.year + 10)
+
+            registru_data_date = st.date_input(
+                "Data înscrierii în registru",
+                value=_default_date,
+                min_value=_min_date,
+                max_value=_max_date,
+                key=f"{key_prefix}registru_data",
+            )
+            registru_data = registru_data_date.isoformat() if registru_data_date else ""
         registru_obs = st.text_area(
             "Observații (de ex. transfer, încetare raporturi de serviciu, alte mențiuni)",
             value=get_val(emp_dosar, "registru_observatii"),
@@ -15151,6 +15296,27 @@ def page_stat_de_functii(conn: sqlite3.Connection):
     """Pagină pentru STATUL DE FUNCȚII: salvare/editare + import din Excel cu mapare de câmpuri."""
     st.subheader("📋 Stat de funcții")
 
+    # Marker + CSS local pentru structurare pe carduri
+    st.markdown('<span id="stat-scope"></span>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        section.main:has(#stat-scope) .stat-card{
+          background: #162a3d;
+          border: 1px solid #2c445c;
+          border-radius: 10px;
+          padding: 24px 28px;
+          margin-bottom: 28px;
+        }
+        section.main:has(#stat-scope) .stat-card h4{
+          margin-top: 0;
+          margin-bottom: 16px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     tab_saved, tab_import = st.tabs(
         ["Stat de funcții salvat", "Import din fișier Excel"]
     )
@@ -15161,6 +15327,8 @@ def page_stat_de_functii(conn: sqlite3.Connection):
     with tab_saved:
         st.markdown("### Stat de funcții salvat (editare directă)")
 
+        # Card 1 – Sincronizare bidirecțională Stat ↔ Angajați
+        st.markdown('<div class="stat-card">', unsafe_allow_html=True)
         with st.expander("🔁 Sincronizare (Stat ↔ Angajați)", expanded=False):
             colA, colB = st.columns(2)
             with colA:
@@ -15200,6 +15368,7 @@ def page_stat_de_functii(conn: sqlite3.Connection):
                             st.rerun()
                         except Exception as e:
                             st.error(f"Eroare la preluarea din Stat de funcții: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
         cur = conn.cursor()
@@ -15216,6 +15385,8 @@ def page_stat_de_functii(conn: sqlite3.Connection):
         else:
             df = pd.read_sql_query("SELECT * FROM stat_functii", conn)
 
+            # Card 2 – Configurare câmpuri (coloane)
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
             st.markdown("#### Configurare câmpuri (coloane)")
             col1, col2 = st.columns(2)
 
@@ -15242,7 +15413,10 @@ def page_stat_de_functii(conn: sqlite3.Connection):
                 if st.button("🗑️ Șterge câmpurile selectate", key="btn_drop_stat_cols"):
                     if cols_to_drop:
                         df = df.drop(columns=list(cols_to_drop))
+            st.markdown("</div>", unsafe_allow_html=True)
 
+            # Card 3 – Editare stat de funcții (tabel mare + salvare)
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
             st.markdown("#### Editare date")
             edited_df = st.data_editor(
                 df,
@@ -15269,6 +15443,11 @@ def page_stat_de_functii(conn: sqlite3.Connection):
 
                 # Reîncărcare UI ca să se vadă imediat în Organigramă / Centralizator / Dosar / Pontaj
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # Card 4 – Export & sincronizare globală
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
+            st.markdown("#### Export și sincronizare globală")
 
             # Export rapid în Excel
             excel_bytes = _df_to_xlsx_bytes(edited_df, sheet_name="Stat_de_functii")
@@ -15285,8 +15464,6 @@ def page_stat_de_functii(conn: sqlite3.Connection):
                 mime=(mimetypes.guess_type("stat_de_functii_salvat.xlsx")[0] or "application/octet-stream"),
                 key="btn_export_stat_functii_salvat",
             )
-
-    
 
             # Export în Word/PDF
             try:
@@ -15317,7 +15494,7 @@ def page_stat_de_functii(conn: sqlite3.Connection):
                     data=buf_docx.getvalue(),
                     file_name="stat_de_functii_salvat.docx",
                     mime=(mimetypes.guess_type("stat_de_functii_salvat.docx")[0] or "application/octet-stream"),
-                key="btn_export_stat_functii_salvat_docx",
+                    key="btn_export_stat_functii_salvat_docx",
                 )
                 pdf_bytes = convert_docx_to_pdf_bytes(buf_docx.getvalue())
                 if pdf_bytes:
@@ -15818,9 +15995,15 @@ def page_pontaj(conn: sqlite3.Connection):
     # Formular pontaj
     col_d, col_ore, col_tip = st.columns(3)
     with col_d:
+        import datetime as _dt_pontaj
+        _today_p = _dt_pontaj.date.today()
+        _min_p = _today_p.replace(year=_today_p.year - 100)
+        _max_p = _today_p.replace(year=_today_p.year + 10)
         data_p = st.date_input(
             "Data",
             value=period_start.date(),
+            min_value=_min_p,
+            max_value=_max_p,
             key="pontaj_data",
         )
     with col_ore:
@@ -16165,85 +16348,461 @@ def main():
         page_pontaj_hub(conn, cfg)
 
     elif main_choice == "Configurare":
-        st.subheader("⚙ Configurare Socrates@HR")
+        # Marker + CSS scoped doar pentru pagina Configurare
+        st.markdown('<span id="cfg-scope"></span>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <style>
+            /* ===== Configurare – layout single column, premium ===== */
+            section.main:has(#cfg-scope) .page-container{
+              max-width: 880px;
+              margin-left: 60px;
+              margin-right: auto;
+              padding-top: 40px;
+              padding-bottom: 80px;
+            }
 
-        with st.expander("🕒 Pontaj (modul separat)", expanded=False):
+            section.main:has(#cfg-scope) .section-card{
+              background: #162a3d;
+              border: 1px solid #2c445c;
+              border-radius: 10px;
+              padding: 32px;
+              margin-bottom: 48px;
+            }
+
+            section.main:has(#cfg-scope) .section-title{
+              font-size: 18px;
+              font-weight: 600;
+              margin-bottom: 24px;
+              color: #e6edf5;
+            }
+
+            section.main:has(#cfg-scope) .section-title::after{
+              content: "";
+              display: block;
+              width: 40px;
+              height: 2px;
+              background: #1d4ed8;
+              margin-top: 8px;
+              opacity: 0.6;
+            }
+
+            section.main:has(#cfg-scope) .form-group{
+              margin-bottom: 20px;
+            }
+
+            section.main:has(#cfg-scope) label{
+              font-size: 13px;
+              color: #9fb3c8 !important;
+              margin-bottom: 6px;
+              display: block;
+            }
+
+            section.main:has(#cfg-scope) input,
+            section.main:has(#cfg-scope) select,
+            section.main:has(#cfg-scope) textarea{
+              height: 40px;
+              padding: 8px 12px;
+            }
+
+            section.main:has(#cfg-scope) .sub-block{
+              background: #132636;
+              border-radius: 8px;
+              padding: 20px;
+              margin-bottom: 20px;
+            }
+
+            section.main:has(#cfg-scope) .upload-zone{
+              background: #132636;
+              border: 1px dashed #2c445c;
+              border-radius: 8px;
+              padding: 20px;
+              transition: border-color 0.2s ease;
+            }
+
+            section.main:has(#cfg-scope) .upload-zone:hover{
+              border-color: #1d4ed8;
+            }
+
+            /* Upload Antet – elimină caseta albă internă și o face albastru închis */
+            section.main:has(#cfg-scope) .upload-zone [data-testid="stFileUploader"]{
+              background: transparent;
+            }
+
+            section.main:has(#cfg-scope) .upload-zone [data-testid="stFileUploader"] > div:first-child{
+              background: #0f172a;
+              border-radius: 10px;
+            }
+
+            section.main:has(#cfg-scope) .upload-zone [data-testid="stFileUploaderDropzone"]{
+              background: #0f172a;
+              border: 1px dashed #2c445c;
+              border-radius: 10px;
+            }
+
+            section.main:has(#cfg-scope) .save-bar{
+              position: sticky;
+              bottom: 0;
+              background: #0f1f2e;
+              padding: 20px 0;
+              border-top: 1px solid #2c445c;
+              margin-top: 16px;
+            }
+
+            section.main:has(#cfg-scope) .save-bar div[data-testid="stButton"] > button{
+              background: #1d4ed8 !important;
+              padding: 10px 22px !important;
+              border-radius: 6px !important;
+              font-weight: 500 !important;
+              border: none !important;
+            }
+
+            section.main:has(#cfg-scope) .save-bar div[data-testid="stButton"] > button:hover{
+              background: #1e40af !important;
+            }
+
+            /* ===== Utilizatori (admin) – government clean dark table ===== */
+            section.main:has(#cfg-scope) .admin-table{
+              width: 100%;
+              border-collapse: separate;
+              border-spacing: 0;
+            }
+
+            section.main:has(#cfg-scope) .admin-table thead{
+              background: #1c3146;
+            }
+
+            section.main:has(#cfg-scope) .admin-table th{
+              padding: 12px 16px;
+              text-align: left;
+              font-weight: 600;
+              color: #e6edf5;
+              border-bottom: 1px solid #2c445c;
+            }
+
+            section.main:has(#cfg-scope) .admin-table td{
+              padding: 12px 16px;
+              background: #162a3d;
+              border-bottom: 1px solid #2c445c;
+              color: #e6edf5;
+            }
+
+            section.main:has(#cfg-scope) .admin-table tr:hover td{
+              background: #1a2e42;
+            }
+
+            /* colțuri rotunjite tabel */
+            section.main:has(#cfg-scope) .admin-table thead tr:first-child th:first-child{
+              border-top-left-radius: 8px;
+            }
+            section.main:has(#cfg-scope) .admin-table thead tr:first-child th:last-child{
+              border-top-right-radius: 8px;
+            }
+            section.main:has(#cfg-scope) .admin-table tbody tr:last-child td:first-child{
+              border-bottom-left-radius: 8px;
+            }
+            section.main:has(#cfg-scope) .admin-table tbody tr:last-child td:last-child{
+              border-bottom-right-radius: 8px;
+            }
+
+            /* badge status */
+            section.main:has(#cfg-scope) .badge-active{
+              background: rgba(22, 163, 74, 0.15);
+              color: #22c55e;
+              padding: 4px 10px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 500;
+              display: inline-block;
+            }
+            section.main:has(#cfg-scope) .badge-inactive{
+              background: rgba(220, 38, 38, 0.15);
+              color: #ef4444;
+              padding: 4px 10px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 500;
+              display: inline-block;
+            }
+
+            /* zona “acțiuni periculoase” */
+            section.main:has(#cfg-scope) .danger-section{
+              background: rgba(220, 38, 38, 0.08);
+              border: 1px solid rgba(220, 38, 38, 0.25);
+              border-radius: 8px;
+              padding: 20px;
+              margin-top: 8px;
+            }
+
+            section.main:has(#cfg-scope) .danger-section div[data-testid="stButton"] > button{
+              background: #7f1d1d !important;
+              color: #ffffff !important;
+            }
+
+            section.main:has(#cfg-scope) .danger-section div[data-testid="stButton"] > button:hover{
+              background: #991b1b !important;
+            }
+
+            /* ===== Formular Utilizatori (admin) – compact, 2 coloane ===== */
+            section.main:has(#cfg-scope) .user-admin-card{
+              background: #162a3d;
+              border: 1px solid #2c445c;
+              border-radius: 10px;
+              padding: 24px 28px;
+              margin-bottom: 24px;
+              max-width: 700px;
+            }
+
+            section.main:has(#cfg-scope) .user-form{
+              max-width: 700px;
+            }
+
+            section.main:has(#cfg-scope) .user-form .form-grid{
+              display: grid;
+              grid-template-columns: 280px 280px;
+              gap: 16px 24px;
+              margin-bottom: 20px;
+            }
+
+            section.main:has(#cfg-scope) .user-form .form-group{
+              display: flex;
+              flex-direction: column;
+            }
+
+            section.main:has(#cfg-scope) .user-form input,
+            section.main:has(#cfg-scope) .user-form select{
+              height: 36px;
+              font-size: 14px;
+              padding: 6px 10px;
+              max-width: 280px;
+            }
+
+            section.main:has(#cfg-scope) .user-form .button-group{
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              align-items: flex-start;
+            }
+
+            /* tabel admin – structură enterprise */
+            section.main:has(#cfg-scope) .admin-table{
+              width: 100%;
+              border-collapse: separate;
+              border-spacing: 0;
+              font-size: 14px;
+            }
+
+            section.main:has(#cfg-scope) .admin-table th,
+            section.main:has(#cfg-scope) .admin-table td{
+              padding: 12px 16px;
+              border-bottom: 1px solid #2c445c;
+              border-right: 1px solid #2c445c;
+            }
+
+            section.main:has(#cfg-scope) .admin-table th:last-child,
+            section.main:has(#cfg-scope) .admin-table td:last-child{
+              border-right: none;
+            }
+
+            section.main:has(#cfg-scope) .admin-table thead{
+              background: #1c3146;
+            }
+
+            section.main:has(#cfg-scope) .admin-table thead th{
+              font-weight: 600;
+              border-bottom: 2px solid #2c445c;
+            }
+
+            section.main:has(#cfg-scope) .admin-table tbody tr{
+              background: #162a3d;
+              font-weight: 400;
+            }
+
+            section.main:has(#cfg-scope) .admin-table tbody tr:hover{
+              background: #1a2e42;
+            }
+
+            section.main:has(#cfg-scope) .admin-table td{
+              white-space: nowrap;
+            }
+
+            section.main:has(#cfg-scope) .table-wrapper{
+              overflow-x: auto;
+            }
+
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="page-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-title">⚙ Configurare Socrates@HR</h2>', unsafe_allow_html=True)
+
+        # Hub navigare configurare
+        cfg_view = st.session_state.get("config_view", "")
+        st.markdown('<div class="config-navigation">', unsafe_allow_html=True)
+        nav_pontaj = st.button("🕒 Pontaj (modul separat)", key="cfg_nav_pontaj")
+        nav_users = st.button("👥 Utilizatori (admin)", key="cfg_nav_users")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if nav_pontaj:
+            st.session_state["config_view"] = "pontaj"
+            st.rerun()
+        if nav_users:
+            st.session_state["config_view"] = "users"
+            st.rerun()
+
+        cfg_view = st.session_state.get("config_view", "")
+
+        # --- Pontaj (modul separat) – pagină dedicată în Configurare ---
+        if cfg_view == "pontaj":
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown('<div class="section-title">🕒 Pontaj (modul separat)</div>', unsafe_allow_html=True)
             cfg["pontaj_url"] = st.text_input(
                 "URL aplicație Pontaj (ex: http://SERVER:8502)",
                 value=str(cfg.get("pontaj_url") or "http://localhost:8502"),
                 key="cfg_pontaj_url",
             )
-        # --- Administrare utilizatori (doar pentru admin) ---
+            if st.button("Închide", key="cfg_close_pontaj"):
+                st.session_state["config_view"] = ""
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # --- Administrare utilizatori (doar pentru admin) – pagină dedicată în Configurare ---
         is_admin = str(st.session_state.get("user_role", "user")) == "admin"
-        if is_admin:
-            with st.expander("👥 Utilizatori (admin)"):
-                ensure_auth_tables(conn)
-                curu = conn.cursor()
-                curu.execute("SELECT username, role, is_active, created_at FROM app_users ORDER BY username")
-                rows_u = curu.fetchall() or []
-                if rows_u:
-                    st.dataframe(
-                        [{"username": r[0], "role": r[1], "active": int(r[2] or 0), "created_at": r[3]} for r in rows_u],
-                        use_container_width=True,
+        if is_admin and cfg_view == "users":
+            st.markdown('<div class="admin-users">', unsafe_allow_html=True)
+            # Buton de închidere pentru secțiunea Utilizatori (admin)
+            if st.button("Închide", key="cfg_close_users"):
+                st.session_state["config_view"] = ""
+                st.rerun()
+
+            ensure_auth_tables(conn)
+            curu = conn.cursor()
+            curu.execute("SELECT username, role, is_active, created_at FROM app_users ORDER BY username")
+            rows_u = curu.fetchall() or []
+            if rows_u:
+                from html import escape as _escape
+
+                body_rows = []
+                for r in rows_u:
+                    username, role, is_active, created_at = r
+                    badge = (
+                        '<span class="badge-active">Activ</span>'
+                        if int(is_active or 0)
+                        else '<span class="badge-inactive">Inactiv</span>'
                     )
+                    created_txt = _escape(str(created_at or ""))
+                    body_rows.append(
+                        f"<tr>"
+                        f"<td>{_escape(str(username or ''))}</td>"
+                        f"<td>{_escape(str(role or ''))}</td>"
+                        f"<td>{badge}</td>"
+                        f"<td>{created_txt}</td>"
+                        f"</tr>"
+                    )
+
+                table_html = """
+                <div class="table-wrapper">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Rol</th>
+                        <th>Status</th>
+                        <th>Creat la</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                """ + "\n".join(body_rows) + """
+                    </tbody>
+                  </table>
+                </div>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
+            else:
+                st.info("Nu există utilizatori în DB (se va crea automat unul la login).")
+
+            st.markdown('<div class="user-admin-card">', unsafe_allow_html=True)
+            st.markdown("##### Adaugă / resetează utilizator")
+
+            st.markdown('<div class="user-form">', unsafe_allow_html=True)
+
+            # Grid intern: Username, Parolă nouă, Rol
+            st.markdown('<div class="form-grid">', unsafe_allow_html=True)
+
+            st.markdown('<div class="form-group">', unsafe_allow_html=True)
+            nu = st.text_input("Username", key="adm_new_user").strip()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="form-group">', unsafe_allow_html=True)
+            npw = st.text_input("Parolă nouă", type="password", key="adm_new_pass")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="form-group">', unsafe_allow_html=True)
+            role = st.selectbox("Rol", ["user", "admin"], key="adm_new_role")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)  # end .form-grid
+
+            # Câmp dezactivare sub grid
+            st.markdown('<div class="form-group">', unsafe_allow_html=True)
+            du = st.text_input("Dezactivează user", key="adm_disable_user").strip()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # Grup butoane – afișate vertical, aliniate stânga
+            st.markdown('<div class="button-group">', unsafe_allow_html=True)
+            if st.button("Salvează (create/update)", key="adm_save_user"):
+                if not nu or not npw:
+                    st.error("Completează username și parolă.")
                 else:
-                    st.info("Nu există utilizatori în DB (se va crea automat unul la login).")
+                    curu.execute(
+                        """
+                        INSERT INTO app_users(username, password_hash, role, is_active, created_at)
+                        VALUES(?, ?, ?, 1, ?)
+                        ON CONFLICT(username) DO UPDATE SET
+                            password_hash=excluded.password_hash,
+                            role=excluded.role,
+                            is_active=1
+                        """,
+                        (nu, sqlite3.Binary(_hash_password(npw)), role, datetime.datetime.now().isoformat(timespec="seconds")),
+                    )
+                    conn.commit()
+                    st.success("Utilizator salvat.")
+                    st.rerun()
+            if st.button("Dezactivează", key="adm_disable_btn"):
+                if not du:
+                    st.error("Scrie username-ul.")
+                else:
+                    curu.execute("UPDATE app_users SET is_active=0 WHERE username=?", (du,))
+                    conn.commit()
+                    st.success("Utilizator dezactivat (dacă exista).")
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)  # end .button-group
 
-                st.markdown("##### Adaugă / resetează utilizator")
-                cu1, cu2, cu3 = st.columns([2, 2, 1])
-                with cu1:
-                    nu = st.text_input("Username", key="adm_new_user").strip()
-                with cu2:
-                    npw = st.text_input("Parolă nouă", type="password", key="adm_new_pass")
-                with cu3:
-                    role = st.selectbox("Rol", ["user", "admin"], key="adm_new_role")
+            # Acțiuni periculoase rămân separate, vizual
+            with st.expander("⚠️ Acțiuni periculoase", expanded=False):
+                st.markdown('<div class="danger-section">', unsafe_allow_html=True)
+                st.caption("Oprește procesul aplicației (local/VPS). Folosește doar când e necesar.")
+                confirm = st.checkbox("Confirm oprirea aplicației", value=False, key="shutdown_confirm")
 
-                ca1, ca2 = st.columns(2)
-                with ca1:
-                    if st.button("Salvează (create/update)", key="adm_save_user"):
-                        if not nu or not npw:
-                            st.error("Completează username și parolă.")
-                        else:
-                            curu.execute(
-                                """
-                                INSERT INTO app_users(username, password_hash, role, is_active, created_at)
-                                VALUES(?, ?, ?, 1, ?)
-                                ON CONFLICT(username) DO UPDATE SET
-                                    password_hash=excluded.password_hash,
-                                    role=excluded.role,
-                                    is_active=1
-                                """,
-                                (nu, sqlite3.Binary(_hash_password(npw)), role, datetime.datetime.now().isoformat(timespec="seconds")),
-                            )
-                            conn.commit()
-                            st.success("Utilizator salvat.")
-                            st.experimental_rerun()
-                with ca2:
-                    du = st.text_input("Dezactivează user", key="adm_disable_user").strip()
-                    if st.button("Dezactivează", key="adm_disable_btn"):
-                        if not du:
-                            st.error("Scrie username-ul.")
-                        else:
-                            curu.execute("UPDATE app_users SET is_active=0 WHERE username=?", (du,))
-                            conn.commit()
-                            st.success("Utilizator dezactivat (dacă exista).")
-                            st.experimental_rerun()
+                if st.button("⛔ Oprește aplicația", disabled=not confirm, key="btn_close_app"):
+                    try:
+                        import os as _os
+                        _os._exit(0)
+                    except Exception:
+                        st.warning("Aplicația a fost oprită. Poți închide această fereastră.")
+                        st.stop()
+                st.markdown("</div>", unsafe_allow_html=True)
 
-                    if is_admin:
-                        with st.expander("⚠️ Acțiuni periculoase", expanded=False):
-                            st.caption("Oprește procesul aplicației (local/VPS). Folosește doar când e necesar.")
-                    confirm = st.checkbox("Confirm oprirea aplicației", value=False, key="shutdown_confirm")
+                st.markdown("</div>", unsafe_allow_html=True)  # end .user-form
+                st.markdown("</div>", unsafe_allow_html=True)  # end .user-admin-card
 
-                    if st.button("⛔ Oprește aplicația", disabled=not confirm, key="btn_close_app"):
-                        try:
-                            import os as _os
-                            _os._exit(0)
-                        except Exception:
-                            st.warning("Aplicația a fost oprită. Poți închide această fereastră.")
-                            st.stop()
+                st.markdown("</div>", unsafe_allow_html=True)  # end .admin-users
 
         # --- Date unitate / instituție ---
-        st.markdown("### Date unitate / instituție")
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Date unitate / instituție</div>', unsafe_allow_html=True)
 
         denumire_unitate = st.text_input(
             "Denumire unitate",
@@ -16275,64 +16834,80 @@ def main():
             "Telefon",
             value=cfg.get("telefon", ""),
             key="cfg_tel",
-)
+        )
         fax = st.text_input(
             "Fax",
             value=cfg.get("fax", ""),
             key="cfg_fax",
-)
+        )
         email = st.text_input(
             "Email",
             value=cfg.get("email", ""),
             key="cfg_email",
-)
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("#### Antet")
+        # --- Antet ---
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Antet documente</div>', unsafe_allow_html=True)
+        st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
         sigla_file = st.file_uploader(
             "Siglă unitate (PNG/JPG) – opțional (se va afișa în stânga antetului)",
             type=["png", "jpg", "jpeg"],
             key="cfg_sigla_upl",
-)
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
         afiseaza_iban_in_antet = st.checkbox(
             "Afișează IBAN în antet (opțional)",
             value=bool(cfg.get("afiseaza_iban_in_antet", False)),
             key="cfg_show_iban",
-)
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("#### Semnare documente (opțional)")
+        # --- Semnare documente + Semnături ---
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Semnare documente</div>', unsafe_allow_html=True)
+
         semnare_metoda = st.selectbox(
             "Metodă semnare",
             options=["Nesemnate", "Olograf (scan)", "Electronic (token)"],
             index={"Nesemnate": 0, "Olograf (scan)": 1, "Electronic (token)": 2}.get(cfg.get("semnare_metoda", "Nesemnate"), 0),
             key="cfg_semnare_metoda",
-)
+        )
 
-
-        # --- Semnături standard (folosite în rapoarte / dosar) ---
-        st.markdown("### Semnături")
-
+        st.markdown('<div class="sub-block">', unsafe_allow_html=True)
+        st.markdown("**Conducător unitate**", unsafe_allow_html=True)
         conducator_nume = st.text_input(
-            "Conducător unitate – nume și prenume",
+            "Nume și prenume",
             value=cfg.get("conducator_nume", ""),
             key="cfg_conducator_nume",
         )
         conducator_functie = st.text_input(
-            "Conducător unitate – funcție",
+            "Funcție",
             value=cfg.get("conducator_functie", ""),
             key="cfg_conducator_functie",
         )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="sub-block">', unsafe_allow_html=True)
+        st.markdown("**Responsabil HR**", unsafe_allow_html=True)
         responsabil_hr_nume = st.text_input(
-            "Responsabil HR – nume și prenume",
+            "Nume și prenume",
             value=cfg.get("responsabil_hr_nume", ""),
             key="cfg_responsabil_hr_nume",
         )
         responsabil_hr_functie = st.text_input(
-            "Responsabil HR – funcție",
+            "Funcție",
             value=cfg.get("responsabil_hr_functie", ""),
             key="cfg_responsabil_hr_functie",
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### User și parolă aplicație (deocamdată doar salvate în config)")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # --- User aplicație ---
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">User aplicație</div>', unsafe_allow_html=True)
 
         app_user = st.text_input(
             "Utilizator aplicație",
@@ -16345,16 +16920,22 @@ def main():
             type="password",
             key="cfg_app_pass",
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### Configurare bază de date")
+        # --- Bază de date ---
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Bază de date</div>', unsafe_allow_html=True)
 
         new_db_path = st.text_input(
             "Calea către baza de date (db_path)",
             value=db_path,
             key="cfg_db_path",
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("### Câmpuri suplimentare (custom)")
+        # --- Câmpuri suplimentare (custom) ---
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Câmpuri suplimentare</div>', unsafe_allow_html=True)
 
         custom_fields: Dict[str, str] = cfg.get("custom_fields", {})
         if not isinstance(custom_fields, dict):
@@ -16394,11 +16975,13 @@ def main():
                     "La următoarea deschidere va apărea în lista de mai sus."
                 )
 
+        st.markdown("</div>", unsafe_allow_html=True)
+
         # -------------------------------------------------------------
         # 📚 NOMENCLATOARE (COR + Legea 153) – Import din Excel/CSV
         # -------------------------------------------------------------
-        st.markdown("---")
-        st.markdown("## 📚 Nomenclatoare (import din Excel/CSV)")
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📚 Nomenclatoare (import din Excel/CSV)</div>', unsafe_allow_html=True)
 
         tab_cor, tab_153 = st.tabs(["🧩 COR", "📜 Legea 153"])
 
@@ -16612,8 +17195,12 @@ def main():
                     pass
 
 
-        # Buton de salvare generală
-        if st.button("💾 Salvează configurarea", key="cfg_btn_save_all"):
+        # Sticky save bar la finalul paginii de configurare (unicul buton de salvare)
+        st.markdown('<div class="save-bar">', unsafe_allow_html=True)
+        save_clicked = st.button("💾 Salvează configurarea", key="cfg_btn_save_all")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if save_clicked:
             cfg["db_path"] = new_db_path
             cfg["denumire_unitate"] = denumire_unitate
             cfg["cui"] = cui
@@ -16655,6 +17242,9 @@ def main():
                 "Configurarea a fost salvată. "
                 "La următoarea rulare se va folosi noua bază de date și noile date de unitate."
             )
+
+        st.markdown("</div>", unsafe_allow_html=True)  # end .section-card Nomenclatoare
+        st.markdown("</div>", unsafe_allow_html=True)  # end .page-container
 
     # IMPORTANT: ca la login – după ce pagina este randată
     if st.session_state.get("logged_in", False):
