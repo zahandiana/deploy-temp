@@ -1305,29 +1305,96 @@ def apply_premium_theme():
         }
 
         /* ===== SECTION LAYOUT + BUTTON STACK (Dashboard/Home) ===== */
-        /* BAR separator intre sectiuni (full width) */
+        /* Bara veche de separare (section-bar) rămâne disponibilă pentru alte pagini,
+           dar NU mai este folosită pe „Acasă”. Delimitarea acolo se face prin carduri. */
         .section-bar{
           width: 100%;
-          height: 2px;
+          height: 1px;
           border-radius: 999px;
-          margin: 18px 0;
+          margin: 10px 0;
           background: linear-gradient(90deg,
             rgba(255,255,255,0.00),
-            rgba(255,255,255,0.14),
+            rgba(255,255,255,0.10),
             rgba(255,255,255,0.00)
           );
+        }
+
+        /* Carduri moderne pentru secțiunile de pe „Acasă” */
+        .section-card{
+          /* delimitare ultra-fină: fundal abia mai deschis + border foarte discret */
+          background: rgba(15,23,42,0.14);
+          border: 1px solid rgba(148,163,184,0.12);
+          border-radius: 12px;
+          padding: 18px 22px;
+          margin-bottom: 18px;
+        }
+
+        .section-title{
+          font-size: 20px;
+          font-weight: 600;
+          margin-bottom: 16px;
+          letter-spacing: 0.3px;
+          color: #e6edf5;
+        }
+
+        .section-subtitle{
+          color: #94a3b8;
+          margin-bottom: 20px;
+        }
+
+        /* Header de pagină (titlu + acțiuni) – folosit pe Acasă, Angajați, Organigramă etc. */
+        .page-header{
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 36px;
+        }
+
+        .page-title,
+        h1{
+          font-size: 36px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          margin: 0;
+          color: #e6edf5;
+        }
+
+        .page-actions{
+          display: flex;
+          gap: 12px;
+        }
+
+        .btn-primary{
+          background: #1d4ed8;
+          border: none;
+          padding: 10px 18px;
+          border-radius: 10px;
+          font-weight: 500;
+          cursor: pointer;
+          color: #e5e7eb;
+        }
+
+        .btn-primary:hover{
+          background: #1e40af;
+        }
+
+        /* Stil aplicat pe butoanele Streamlit din header (în loc de <button>) */
+        .page-actions div[data-testid="stButton"] > button{
+          background: #1d4ed8 !important;
+          border: none !important;
+          padding: 10px 18px !important;
+          border-radius: 10px !important;
+          font-weight: 500 !important;
+          cursor: pointer !important;
+        }
+
+        .page-actions div[data-testid="stButton"] > button:hover{
+          background: #1e40af !important;
         }
 
         /* Wrapper: toate sectiunile sunt aliniate la stanga */
         .section-wrap{
           display: block;
-        }
-
-        /* Titluri sectiuni */
-        .section-title{
-          font-size: 16px;
-          font-weight: 800;
-          margin: 0 0 10px 0;
         }
 
         /* Butoane “stacked”: narrow, identice, stanga */
@@ -3475,19 +3542,28 @@ def page_home(conn, cfg):
         unsafe_allow_html=True,
     )
 
-    user = st.session_state.get("username") or "utilizator"
+    user = st.session_state.get("username") or "administrator"
+
+    # Titlu principal de pagină – stil identic cu Organigramă
+    st.markdown(
+        f'<h1 class="page-title">👋 Bun venit, {user}</h1>',
+        unsafe_allow_html=True,
+    )
 
     # SECTIUNE: Bun venit
-    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-    st.markdown(f"### 👋 Bun venit, {user}")
-    st.caption("Alege o acțiune rapidă sau folosește căutarea pentru a ajunge instant la un angajat.")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">Panou principal</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-subtitle">'
+        "Alege o acțiune rapidă sau folosește căutarea."
+        "</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
-
     # SECTIUNE: Continuă (istoric recent)
-    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-    st.markdown("### Continuă")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Continuă</div>', unsafe_allow_html=True)
     # “Continuă” = ultimul element din istoric
     rec = st.session_state.get("home_recent", [])
     if rec:
@@ -3501,11 +3577,9 @@ def page_home(conn, cfg):
         st.caption("După ce folosești aplicația, aici apare ultimul modul accesat.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
-
     # SECTIUNE: Scurtături (butoane narrow, una sub alta)
-    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-    st.markdown("### ⚡ Scurtături")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">⚡ Scurtături</div>', unsafe_allow_html=True)
     if st.button("👤 Caută angajat", key="sh_find"):
         goto("Angajați")
     if st.button("➕ Adaugă angajat", key="sh_add"):
@@ -3517,11 +3591,9 @@ def page_home(conn, cfg):
         goto("Configurare")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
-
     # SECTIUNE: Căutare rapidă (doar butoanele ei)
-    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-    st.markdown("### 🔎 Căutare rapidă")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🔎 Căutare rapidă</div>', unsafe_allow_html=True)
     q = st.text_input(
         "",
         placeholder="Ex: Popescu Ioana / 29xxxxxxxxxxxxx / EMP-1024",
@@ -3540,11 +3612,9 @@ def page_home(conn, cfg):
     st.caption("Tip: CNP pentru potrivire exactă.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
-
     # SECTIUNE: Acțiuni rapide (una sub alta, narrow)
-    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-    st.markdown("### ⚡ Acțiuni rapide")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">⚡ Acțiuni rapide</div>', unsafe_allow_html=True)
     if st.button("👥 Angajați", key="qa_emp"):
         add_recent("nav", "Angajați", "Angajați", {})
         goto("Angajați")
@@ -3560,16 +3630,14 @@ def page_home(conn, cfg):
         goto("Pontaj")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
-
     # Patch final pentru dashboard (headings + text + input + butoane)
     apply_dashboard_patch()
 
     st.write("")
 
     # --- ISTORIC RECENT ---
-    st.markdown('<div class="home-section">', unsafe_allow_html=True)
-    st.subheader("🕘 Istoric recent")
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🕘 Istoric recent</div>', unsafe_allow_html=True)
     rec = st.session_state.home_recent
     if not rec:
         st.caption("Încă nu ai istoric. După ce folosești modulele, aici apar ultimele acțiuni.")
@@ -8077,9 +8145,18 @@ def page_angajati(conn: sqlite3.Connection):
         <style>
         /* ===== Scoped doar pe pagina Angajați ===== */
         section.main:has(#emp-scope) .emp-title{
-          font-size: 34px;
+          font-size: 40px;          /* baza pentru icon + container */
           font-weight: 900;
           margin: 0 0 6px 0;
+        }
+        /* cuvântul ANGAJAȚI – foarte mare, uppercase */
+        section.main:has(#emp-scope) .emp-title-main{
+          display: inline-block;
+          font-size: 56px !important;
+          font-weight: 900 !important;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #F9FAFB !important;
         }
 
         section.main:has(#emp-scope) .emp-subtitle{
@@ -8087,6 +8164,15 @@ def page_angajati(conn: sqlite3.Connection):
           font-weight: 600;
           opacity: .95;
           margin: 10px 0 10px 0;
+        }
+
+        /* Wrapper general Angajați – card discret, ca pe „Acasă” */
+        section.main:has(#emp-scope) .emp-wrap{
+          background: rgba(15,23,42,0.14);
+          border: 1px solid rgba(148,163,184,0.12);
+          border-radius: 12px;
+          padding: 18px 22px;
+          margin-bottom: 18px;
         }
 
         /* Divider subțire */
@@ -10155,14 +10241,27 @@ def page_angajati(conn: sqlite3.Connection):
 
     st.markdown("<div class='emp-wrap'>", unsafe_allow_html=True)
 
-    # Header: titlu + buton imediat sub el
-    st.markdown('<div class="emp-title">👥 Angajați</div>', unsafe_allow_html=True)
-    add_personal = st.button("➕ ADAUGĂ PERSONAL", key="emp_add_personal")
+    # Header: titlu principal + acțiune, în stil unificat cu Organigramă
+    st.markdown(
+        """
+        <div class="page-header">
+          <h1 class="page-title">👥 Angajați</h1>
+          <div class="page-actions">
+        """,
+        unsafe_allow_html=True,
+    )
+    add_personal = st.button("+ Adaugă personal", key="emp_add_personal")
     if add_personal:
         st.session_state["ang_view"] = "add"
         st.session_state["ang_selected_id"] = None
         st.rerun()
-    st.markdown('<div class="thin-divider"></div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # CARD 1 – Filtru angajați (căutare)
     st.markdown("<div class='filter-card'>", unsafe_allow_html=True)
