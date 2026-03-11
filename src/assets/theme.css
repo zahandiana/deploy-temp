@@ -734,6 +734,14 @@ section[data-testid="stSidebar"] .sb-user{
   margin: 10px 0 14px 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
+section[data-testid="stSidebar"] .sb-user-title{
+  font-size: 0.80rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(191,219,254,0.95);
+  margin-bottom: 4px;
+}
 section[data-testid="stSidebar"] .sb-user .name{
   font-weight: 700;
   color: rgba(255,255,255,0.92);
@@ -758,7 +766,7 @@ section[data-testid="stSidebar"] label[data-baseweb="radio"]{
   border: 1px solid rgba(255,255,255,0.07) !important;
   border-radius: 12px !important;
   padding: 10px 14px !important;
-  margin: 6px 0 !important;
+  margin: 6px 0 !important;           /* spațiere uniformă între TOATE butoanele */
   width: 100% !important;
   min-height: 44px !important;
   box-sizing: border-box !important;
@@ -773,6 +781,15 @@ section[data-testid="stSidebar"] label[data-baseweb="radio"] > div:last-child{
 }
 section[data-testid="stSidebar"] [data-baseweb="radio-group"]{
   width: 100% !important;
+  margin: 0 !important;               /* elimină gap-uri suplimentare între grupuri */
+}
+
+/* Container generic al fiecărui st.radio din sidebar – fără margini suplimentare,
+   astfel încât distanța dintre toate butoanele (inclusiv între Angajați și Stat de funcții)
+   să fie controlată doar de margin-ul de pe label[data-baseweb="radio"]. */
+section[data-testid="stSidebar"] div[data-testid="stRadio"]{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 section[data-testid="stSidebar"] [data-baseweb="radio-group"] label{
   width: 100% !important;
@@ -890,7 +907,7 @@ section[data-testid="stSidebar"] label[data-baseweb="radio"] div[role="radiogrou
   color: #ffffff;
   font-weight: 850;
   font-size: 0.95rem;
-  margin: 12px 0 6px 0;
+  margin: 0; /* nu mai adăugăm spațiu suplimentar între grupuri */
 }
 
 /* Submenu Dosar: secondary expander look */
