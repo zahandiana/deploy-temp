@@ -16393,55 +16393,50 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # Sidebar: user card (username + rol)
+    # Sidebar: user card (username ca nume principal)
     _user = (st.session_state.get("username") or "").strip() or "—"
-    _role = (st.session_state.get("user_role") or "user").strip()
     st.sidebar.markdown(
         f'<div class="sb-user">'
+        f'<div class="sb-user-title">UTILIZATOR</div>'
         f'<div class="name">{_user}</div>'
-        f'<div class="meta">{_role}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
 
-    # Două grupuri: Operațional + Administrativ (navigare prin on_change)
-    OPS = ["🏠 Acasă", "Angajați", "Organigramă"]
-    ADM = ["Stat de funcții", "Dosar profesional", "Pontaj", "Configurare"]
+    # Navigare principală: meniu unitar, cu spacing controlat, dar păstrând aceleași valori logice.
+    OPS = ["🏠 Acasă", "Organigramă", "Angajați"]
+    ADM = ["Stat de funcții", "Pontaj", "Dosar profesional", "Configurare"]
+    NAV = OPS + ADM
 
     main_choice = st.session_state.get("main_choice", "🏠 Acasă")
-    if main_choice not in OPS and main_choice not in ADM:
+    if main_choice not in NAV:
         main_choice = "🏠 Acasă"
         st.session_state["main_choice"] = main_choice
     st.session_state.setdefault("main_choice", main_choice)
 
-    ops_index = OPS.index(main_choice) if main_choice in OPS else 0
-    adm_index = ADM.index(main_choice) if main_choice in ADM else 0
+    nav_index = NAV.index(main_choice)
 
-    def _on_ops_change():
-        st.session_state["main_choice"] = st.session_state["sidebar_ops_pick"]
-
-    def _on_adm_change():
-        st.session_state["main_choice"] = st.session_state["sidebar_adm_pick"]
-
-    st.sidebar.markdown("<div class='sb-group'>Operațional</div>", unsafe_allow_html=True)
-    st.sidebar.radio(
+    # Un singur st.radio pentru toate butoanele principale – spacing uniform, flow vertical coerent.
+    nav_choice = st.sidebar.radio(
         "",
-        OPS,
-        index=ops_index,
-        key="sidebar_ops_pick",
+        NAV,
+        index=nav_index,
+        key="sidebar_nav_pick",
         label_visibility="collapsed",
-        on_change=_on_ops_change,
     )
 
-    st.sidebar.markdown("<div class='sb-group'>Administrativ</div>", unsafe_allow_html=True)
-    st.sidebar.radio(
-        "",
-        ADM,
-        index=adm_index,
-        key="sidebar_adm_pick",
-        label_visibility="collapsed",
-        on_change=_on_adm_change,
-    )
+    # Păstrăm comportamentul existent: main_choice rămâne sursa adevărului.
+    st.session_state["main_choice"] = nav_choice
+
+    # Sincronizăm vechile chei de stare astfel încât orice logică existentă bazată pe ele
+    # să continue să funcționeze identic.
+    if nav_choice in OPS:
+        st.session_state["sidebar_ops_pick"] = nav_choice
+        # Dacă nu e selectat nimic în ADM, păstrăm ultima alegere sau primul element.
+        st.session_state.setdefault("sidebar_adm_pick", ADM[0])
+    else:
+        st.session_state["sidebar_adm_pick"] = nav_choice
+        st.session_state.setdefault("sidebar_ops_pick", OPS[0])
 
     main_choice = st.session_state.get("main_choice", "🏠 Acasă")
 
