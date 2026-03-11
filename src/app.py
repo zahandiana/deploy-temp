@@ -299,7 +299,70 @@ div[data-testid="stTextInput"] div[data-baseweb="base-input"] *[style*="backgrou
   background-color: transparent !important;
   box-shadow: none !important;
 }
-...</style>
+
+/* ===== LOGIN V2: bară AUTENTIFICARE + câmpuri consistente ===== */
+
+.login-card{
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.login-header-bar{
+  width: 100%;
+  text-align: center;
+  padding: 11px 20px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(15,23,42,0.98), rgba(15,23,42,0.90));
+  border: 1px solid rgba(148,163,184,0.70);
+  color: #FFFFFF;
+  font-size: 0.98rem;
+  font-weight: 820;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.80);
+}
+
+.login-card .login-field{
+  margin-bottom: 12px;
+}
+
+.login-card .login-field-label{
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: rgba(226,232,240,0.92);
+  margin-bottom: 4px;
+}
+
+.login-card .login-field div[data-testid="stTextInputRootElement"]{
+  background: radial-gradient(circle at top left, rgba(15,23,42,0.98), rgba(15,23,42,0.88)) !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(148,163,184,0.70) !important;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.85) !important;
+  overflow: hidden !important;
+}
+
+.login-card .login-field input{
+  height: 46px !important;
+  padding: 0 18px !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: #F9FAFB !important;
+  font-weight: 500 !important;
+}
+
+.login-card .login-field input::placeholder{
+  color: rgba(148,163,184,0.95) !important;
+}
+
+.login-card .login-field div[data-testid="stTextInputRootElement"]:focus-within{
+  border-color: rgba(56,189,248,0.90) !important;
+  box-shadow: 0 0 0 1px rgba(56,189,248,0.85), 0 0 0 6px rgba(8,47,73,0.85) !important;
+}
+</style>
 """
 
 APP_THEME_CSS = """
@@ -1224,7 +1287,8 @@ def apply_premium_theme():
         <style>
         /* Workspace centrat + padding */
         .block-container{
-          max-width: 1280px !important;
+          width: 100% !important;
+          max-width: 100% !important;
           padding-top: 1.15rem !important;
           padding-bottom: 2rem !important;
         }
@@ -1496,13 +1560,21 @@ def apply_centered_layout(max_width_px: int = 1280):
         f"""
         <style>
         section.main .block-container {{
-            max-width: {max_width_px}px !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            padding-left: 2.2rem !important;
-            padding-right: 2.2rem !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
             padding-top: 1.2rem !important;
             padding-bottom: 2.2rem !important;
+        }}
+
+        [data-testid="stAppViewContainer"],
+        main[data-testid="stMain"],
+        div[data-testid="stMainBlockContainer"] {{
+            width: 100% !important;
+            max-width: 100% !important;
         }}
 
         div[data-testid="stAppViewContainer"] {{
@@ -1637,11 +1709,16 @@ def inject_css(css: str | None = None):
             logged_in = False
 
         if not logged_in:
-            img_path = BASE_DIR / "assets" / "grecia.png"
+            # Fundal pentru pagina de login: statuie.jpeg, cu fallback pe grecia.png apoi fundal.jpeg
+            img_path = BASE_DIR / "assets" / "statuie.jpeg"
             if not img_path.exists():
-                alt_path = BASE_DIR / "assets" / "fundal.jpeg"
+                alt_path = BASE_DIR / "assets" / "grecia.png"
                 if alt_path.exists():
                     img_path = alt_path
+                else:
+                    alt_path2 = BASE_DIR / "assets" / "fundal.jpeg"
+                    if alt_path2.exists():
+                        img_path = alt_path2
 
             if img_path.exists():
                 try:
@@ -5480,7 +5557,8 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
     )
 
     st.markdown('<div class="bg-glow"></div>', unsafe_allow_html=True)
-    st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
+    # spațiu vertical ușor redus pentru a aduce hero-ul mai sus
+    st.markdown("<div style='height:4vh'></div>", unsafe_allow_html=True)
 
     left, mid, right = st.columns([1.1, 1.8, 1.1])
     with mid:
@@ -5491,26 +5569,27 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
             <div class="login-hero">
               <div class="brand">Socrates@HR</div>
               <div class="login-hero-desc">Platformă instituțională pentru administrarea resurselor umane</div>
-              <div class="login-hero-tagline">Acces securizat • Auditabil • Conform fluxurilor interne</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
         st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='login-title'>Autentificare</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Introduceți credențialele.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-header-bar'>AUTENTIFICARE</div>", unsafe_allow_html=True)
 
-        # Câmpuri login într-un singur bloc logic
+        # Câmpuri login într-un singur bloc logic (markup stabil pentru styling dedicat)
         def _login_field(label: str, key: str, *, is_password: bool = False, placeholder: str = "") -> str:
-            st.markdown(f"**{label}**")
-            return st.text_input(
+            st.markdown("<div class='login-field'>", unsafe_allow_html=True)
+            st.markdown(f"<div class='login-field-label'>{label}</div>", unsafe_allow_html=True)
+            value = st.text_input(
                 label,
                 key=key,
                 type="password" if is_password else "default",
                 placeholder=placeholder,
                 label_visibility="collapsed",
             )
+            st.markdown("</div>", unsafe_allow_html=True)
+            return value
 
         u = _login_field("Utilizator", "login_user", is_password=False, placeholder="ex: ioana.popescu")
         p = _login_field("Parolă", "login_pass", is_password=True, placeholder="••••••••")
@@ -5519,7 +5598,7 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
         apply_login_fix()
 
         st.markdown("<div class='primary-btn'>", unsafe_allow_html=True)
-        login_clicked = st.button("Autentificare", use_container_width=True, key="login_btn")
+        login_clicked = st.button("Intră în cont", use_container_width=True, key="login_btn")
         st.markdown("</div>", unsafe_allow_html=True)
 
         # Ajutor mic, sub buton (secondary)
