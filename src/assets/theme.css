@@ -312,25 +312,30 @@ div[data-baseweb="input"] input::placeholder{
   background: rgba(0,0,0,0.24);
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: 18px;
-  padding: 16px 18px;
+  padding: 20px 22px;
   box-shadow: 0 22px 50px rgba(0,0,0,0.40);
   backdrop-filter: blur(12px);
   animation: enter 520ms ease-out both;
 }
 
 .home-hero .title{
-  font-size: 1.25rem;
-  font-weight: 860;
-  letter-spacing: -0.02em;
+  font-size: 1.6rem;
+  font-weight: 880;
+  letter-spacing: -0.01em;
+}
+.home-hero .brand-mark{
+  font-weight: 900;
+  letter-spacing: 0.02em;
 }
 .home-hero .subtitle{
-  margin-top: 6px;
+  margin-top: 8px;
   color: rgba(255,255,255,0.64);
-  font-size: 0.95rem;
+  font-size: 0.98rem;
 }
 
 .home-grid-title{
-  margin-top: 16px;
+  margin-top: 4px;
+  margin-bottom: 16px;
   font-size: 1.05rem;
   font-weight: 760;
 }
@@ -339,8 +344,15 @@ div[data-baseweb="input"] input::placeholder{
   background: rgba(0,0,0,0.36);
   border: 1px solid rgba(255,255,255,0.14);
   border-radius: 16px;
-  padding: 14px;
+  padding: 16px 18px;
   transition: transform 170ms ease, border-color 170ms ease, background 170ms ease;
+}
+.home-card + .home-card{
+  margin-top: 14px;
+}
+
+section.main:has(#dash-scope) .home-card{
+  margin-bottom: 16px;
 }
 .home-card:hover{
   transform: translateY(-4px);
@@ -401,6 +413,45 @@ div[data-baseweb="input"] input::placeholder{
   margin-top: 10px;
 }
 
+/* Home – scurtături + căutare: spacing și aliniere coerente */
+section.main:has(#dash-scope) .home-shortcuts div[data-testid="stButton"]{
+  margin-top: 8px !important;
+  margin-bottom: 0 !important;
+}
+
+section.main:has(#dash-scope) .home-search > div[data-testid="stTextInput"]{
+  margin-top: 8px !important;
+  margin-bottom: 0 !important;
+}
+
+section.main:has(#dash-scope) .home-search > div[data-testid="column"]{
+  margin-top: 8px !important;
+}
+
+.home-card-title{
+  font-size: 1.02rem;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.home-card-text{
+  font-size: 0.92rem;
+  color: rgba(226,232,240,0.88);
+}
+
+.home-section-title{
+  font-size: 0.98rem;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(226,232,240,0.94);
+  margin-bottom: 8px;
+}
+.home-section-text{
+  font-size: 0.9rem;
+  color: rgba(226,232,240,0.80);
+}
+
 /* Home: câmpuri de căutare – capsulă dark, fără alb dedesubt */
 .home-section div[data-baseweb="input"]{
   background: #0B1220 !important;
@@ -425,6 +476,16 @@ div[data-baseweb="input"] input::placeholder{
 .org-wrap{
   position: relative;
   z-index: 1;
+  margin-top: 0 !important;
+}
+
+/* Reduce padding-top global doar când suntem în Organigramă (marker #org-scope) */
+section.main:has(#org-scope){
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+section.main:has(#org-scope) .block-container{
+  padding-top: 0 !important;
 }
 
 /* Panouri (stânga/dreapta) */
@@ -486,6 +547,20 @@ div[data-baseweb="input"] input::placeholder{
   border: 1px solid rgba(148,163,184,0.55) !important;
   border-radius: 12px !important;
   color: rgba(248,250,252,0.96) !important;
+}
+
+/* Dropdown-uri COPIL / PĂRINTE – text ALB: label + valoare selectată + opțiuni */
+.org-wrap [data-testid="stSelectbox"] p,
+.org-wrap [data-testid="stSelectbox"] label,
+.org-wrap div[data-baseweb="select"],
+.org-wrap div[data-baseweb="select"] span,
+.org-wrap div[data-baseweb="select"] div{
+  color: #ffffff !important;
+}
+/* Lista de opțiuni este randată într-un portal separat – forțăm global text alb */
+div[role="listbox"] div[role="option"],
+div[role="listbox"] div[role="option"] span{
+  color: #ffffff !important;
 }
 .org-wrap .stTextInput input::placeholder{
   color: rgba(148,163,184,0.95) !important;
@@ -557,6 +632,31 @@ div[data-baseweb="input"] input::placeholder{
   -webkit-backdrop-filter: blur(16px);
 }
 
+/* Variantă status – fără container vizual (doar conținut) */
+.org-card.org-card-status{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 0 10px 0 !important;
+}
+
+/* Variantă sincronizare – fără container vizual (doar conținut) */
+.org-card.org-card-sync{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 10px 0 0 0 !important;
+}
+
+
+/* Variantă pentru Structură internă – fără „bară” sus (fără border/shadow vizibil) */
+.org-card.org-card-struct{
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Org – tabele din Structură internă: fără alb, glass dark */
 .org-card .stDataFrame{
   border-radius: 14px !important;
@@ -583,15 +683,14 @@ div[data-baseweb="input"] input::placeholder{
 
 /* tabs styling în org */
 .org-wrap div[data-baseweb="tab-list"]{
-  gap: 10px !important;
-  padding: 8px 6px !important;
-  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  gap: 6px !important;
+  padding: 4px 0 !important;
 }
 .org-wrap button[role="tab"]{
-  background: rgba(255,255,255,0.03) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 999px !important;
-  padding: 7px 14px !important;
+  background: rgba(15,23,42,0.80) !important;
+  border: 1px solid rgba(148,163,184,0.40) !important;
+  border-radius: 6px !important;
+  padding: 6px 12px !important;
   color: rgba(245,245,245,0.82) !important;
   font-weight: 700 !important;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
@@ -603,10 +702,10 @@ div[data-baseweb="input"] input::placeholder{
   transform: translateY(-0.5px);
 }
 .org-wrap button[role="tab"][aria-selected="true"]{
-  background: linear-gradient(135deg, rgba(15,23,42,0.96), rgba(15,23,42,0.90)) !important;
-  border-color: rgba(148,163,184,0.80) !important;
+  background: rgba(15,23,42,1.0) !important;
+  border-color: rgba(148,163,184,0.90) !important;
   color: rgba(248,250,252,0.96) !important;
-  box-shadow: 0 12px 30px rgba(15,23,42,0.9);
+  box-shadow: 0 8px 24px rgba(15,23,42,0.85);
 }
 
 /* Expander + ancore doar în org-wrap */
@@ -651,10 +750,11 @@ div[data-baseweb="input"] input::placeholder{
 .org-kpi .value{ font-size: 1.1rem; font-weight: 820; margin-top: 2px; }
 
 /* Import: Status KPIs */
+/* Import: Status KPIs */
 .org-kpis{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 18px;          /* puțin mai mult spațiu între carduri */
   margin-top: 10px;
 }
 @media (max-width: 1100px){
@@ -674,7 +774,7 @@ div[data-baseweb="input"] input::placeholder{
 .org-kpi .value{
   font-size: 1.15rem;
   font-weight: 860;
-  margin-top: 2px;
+  margin-left: 6px;        /* mic spațiu orizontal între etichetă și cifră */
 }
 
 /* Refresh button tighter (scoped in org) */
