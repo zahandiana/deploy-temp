@@ -5538,13 +5538,12 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
         # Câmpuri login într-un singur bloc logic (markup stabil pentru styling dedicat)
         def _login_field(label: str, key: str, *, is_password: bool = False, placeholder: str = "") -> str:
             st.markdown("<div class='login-field'>", unsafe_allow_html=True)
-            st.markdown(f"<div class='login-field-label'>{label}</div>", unsafe_allow_html=True)
             value = st.text_input(
                 label,
                 key=key,
                 type="password" if is_password else "default",
                 placeholder=placeholder,
-                label_visibility="collapsed",
+                label_visibility="visible",
             )
             st.markdown("</div>", unsafe_allow_html=True)
             return value
@@ -5558,7 +5557,6 @@ def require_login(conn: sqlite3.Connection, cfg: dict) -> None:
         st.markdown("<div class='primary-btn'>", unsafe_allow_html=True)
         login_clicked = st.button("Intră în cont", use_container_width=True, key="login_btn")
         st.markdown("</div>", unsafe_allow_html=True)
-
         # Ajutor mic, sub buton (secondary)
         st.markdown("<div class='help-row'>", unsafe_allow_html=True)
         help_clicked = st.button("Ai nevoie de ajutor?", key="help_btn_link")
@@ -8182,6 +8180,35 @@ def page_angajati(conn: sqlite3.Connection):
     """
     # Marker + CSS local: scoped doar pentru pagina Angajați (pentru titluri, filtre etc.)
     st.markdown('<span id="emp-scope"></span>', unsafe_allow_html=True)
+    def _inject_angajati_page_spacing_fix() -> None:
+        st.markdown(
+            """
+            <style>
+            /* Angajați: fără spații artificiale înainte de conținut */
+            section.main:has(#emp-scope) .block-container{
+              padding-top: 0 !important;
+              margin-top: 0 !important;
+            }
+            section.main:has(#emp-scope) .block-container > div[data-testid="stVerticalBlock"]{
+              margin-top: 4px !important;
+            }
+            section.main:has(#emp-scope) .block-container > div:first-child{
+              margin-top: 0 !important;
+              padding-top: 0 !important;
+            }
+            .ang-page-title{
+              margin-top: 0 !important;
+              padding-top: 0 !important;
+              margin-bottom: 0.35rem !important;
+            }
+            .ang-gap-xs{ height: 0.3rem; }
+            .ang-gap-sm{ height: 0.5rem; }
+            .ang-gap-md{ height: 0.7rem; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    _inject_angajati_page_spacing_fix()
     st.markdown(
         """
         <style>
@@ -8376,6 +8403,49 @@ def page_angajati(conn: sqlite3.Connection):
         section.main:has(#emp-scope) div[data-testid="stExpander"] details{
           border-radius: 6px !important;
         }
+        /* Toate secțiunile și casetele în partea stângă */
+        section.main:has(#emp-scope) .block-container{
+          text-align: left !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          padding-left: 1rem !important;
+          padding-top: 0.35rem !important;
+          margin-top: 0 !important;
+        }
+        section.main:has(#emp-scope) .page-title{
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+        section.main:has(#emp-scope) div[data-testid="stMainBlockContainer"]{
+          padding-top: 0 !important;
+          margin-top: 0 !important;
+        }
+        section.main:has(#emp-scope) .block-container > div:first-child{
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+        section.main:has(#emp-scope) [data-testid="stVerticalBlock"],
+        section.main:has(#emp-scope) [data-testid="stVerticalBlockBorderWrapper"],
+        section.main:has(#emp-scope) .emp-wrap [data-testid="stVerticalBlock"],
+        section.main:has(#emp-scope) .emp-wrap [data-testid="stVerticalBlockBorderWrapper"],
+        section.main:has(#emp-scope) .s-card,
+        section.main:has(#emp-scope) [data-testid="stVerticalBlock"] > div,
+        section.main:has(#emp-scope) form,
+        section.main:has(#emp-scope) div[data-testid="stForm"]{
+          text-align: left !important;
+        }
+        section.main:has(#emp-scope) [data-testid="stHorizontalBlock"]{
+          justify-content: flex-start !important;
+        }
+        section.main:has(#emp-scope) [data-testid="stHorizontalBlock"] > div{
+          flex: 0 1 auto !important;
+          min-width: 0;
+        }
+        section.main:has(#emp-scope) form [data-testid="stFormSubmitButton"] > button,
+        section.main:has(#emp-scope) .emp-wrap form [data-testid="stFormSubmitButton"] > button{
+          font-weight: 700 !important;
+          min-width: 140px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -8407,16 +8477,40 @@ def page_angajati(conn: sqlite3.Connection):
         mode = st.session_state["ang_view"]
         emp_id = st.session_state.get("ang_selected_id")
 
-        top1, top2 = st.columns([1, 3])
+        top1, top2 = st.columns([1, 8], vertical_alignment="center")
         with top1:
             if st.button("⬅ Înapoi la listă", key="ang_back_to_list_from_mode"):
                 st.session_state["ang_view"] = "list"
                 st.session_state["ang_selected_id"] = None
                 st.rerun()
         with top2:
-            st.markdown('<h2 class="page-title">Angajați</h2>', unsafe_allow_html=True)
+            st.markdown("", unsafe_allow_html=True)
 
         if mode == "add":
+            st.markdown(
+                """
+                <style>
+                section.main:has(#emp-scope) .st-key-ang_add_form{
+                  max-width: 980px !important;
+                  margin-left: 0 !important;
+                  margin-right: auto !important;
+                }
+                section.main:has(#emp-scope) .st-key-ang_add_form [data-testid="stHorizontalBlock"]{
+                  justify-content: flex-start !important;
+                }
+                .st-key-ang_add_save_btn button,
+                .st-key-ang_add_cancel_btn button{
+                  width: 220px !important;
+                  min-width: 220px !important;
+                  max-width: 220px !important;
+                  height: 42px !important;
+                  min-height: 42px !important;
+                  max-height: 42px !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
             st.subheader("➕ Adaugă angajat")
             st.info("Câmpuri obligatorii pentru înregistrare nouă: Marcă, Nume, Prenume și CNP (valid).")
             with st.form("ang_add_form"):
@@ -8455,11 +8549,8 @@ def page_angajati(conn: sqlite3.Connection):
                     else:
                         st.error(info.error or "CNP invalid – nu pot extrage datele.")
 
-                c_save, c_cancel = st.columns([1, 1])
-                with c_save:
-                    ok = st.form_submit_button("💾 Salvează")
-                with c_cancel:
-                    cancel = st.form_submit_button("↩ Renunță")
+                ok = st.form_submit_button("💾 Salvează", key="ang_add_save_btn")
+                cancel = st.form_submit_button("↩ Renunță", key="ang_add_cancel_btn")
 
             if cancel:
                 st.session_state["ang_selected_id"] = None
@@ -8795,7 +8886,10 @@ def page_angajati(conn: sqlite3.Connection):
                         else:
                             df_dep = pd.DataFrame(columns=["ID", "EMPLOYEE_ID", "TIP", "NUME", "PRENUME", "CNP", "DATA_NASTERII", "GRAD_RUDENIE", "OBSERVATII", "ACTIV"])
 
-                        st.markdown("### Listă")
+                        st.markdown(
+                            '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Listă</p>',
+                            unsafe_allow_html=True,
+                        )
                         if df_dep.empty:
                             st.info("Nu există persoane în întreținere.")
                         else:
@@ -8856,7 +8950,10 @@ def page_angajati(conn: sqlite3.Connection):
                                 }
 
                         st.divider()
-                        st.markdown("### Detalii")
+                        st.markdown(
+                            '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Detalii</p>',
+                            unsafe_allow_html=True,
+                        )
 
                         # --- FORMULAR Detalii: restul pe 2 coloane, Grad rudenie + Observații în stânga ---
                         counter = st.session_state[f"{K}key_counter"]
@@ -8922,9 +9019,17 @@ def page_angajati(conn: sqlite3.Connection):
                             observatii = st.text_area("Observații", value=current.get("observatii", ""), height=140, key=f"{K}obs_{counter}")
 
                             is_new = cur_dep_id is None
-                            save = st.form_submit_button("Adaugă" if is_new else "Salvează")
-                            cancel = st.form_submit_button("Renunță")
-                            delete = st.form_submit_button("Dezactivează", disabled=is_new)
+                            st.markdown(
+                                '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Acțiuni</p>',
+                                unsafe_allow_html=True,
+                            )
+                            btn_col1, btn_col2, btn_col3 = st.columns(3)
+                            with btn_col1:
+                                save = st.form_submit_button("Adaugă în listă" if is_new else "Salvează modificările")
+                            with btn_col2:
+                                cancel = st.form_submit_button("Anulează")
+                            with btn_col3:
+                                delete = st.form_submit_button("Dezactivează persoana", disabled=is_new)
 
                         if cancel:
                             st.session_state[f"{K}reset_pending"] = True
@@ -8943,12 +9048,14 @@ def page_angajati(conn: sqlite3.Connection):
                                 "activ": 1 if activ else 0,
                             }
                             _dependent_upsert(conn, emp_id, dep_values, dep_id=int(cur_dep_id) if cur_dep_id else None)
+                            load_employee_bundle.clear()
                             st.success("Adăugat în listă." if cur_dep_id is None else "Salvat.")
                             st.session_state[f"{K}reset_pending"] = True
                             st.rerun()
 
                         if delete and cur_dep_id:
                             _dependent_soft_delete(conn, int(cur_dep_id))
+                            load_employee_bundle.clear()
                             st.success("Dezactivat (soft delete).")
                             st.session_state[f"{K}reset_pending"] = True
                             st.rerun()
@@ -8957,7 +9064,11 @@ def page_angajati(conn: sqlite3.Connection):
                 # ---------------------------------------------------------------------------------#
     
                 with tabs[2]:
-                    st.subheader("⏳ Vechime")
+                    st.markdown(
+                        "<p style=\"color:#000; font-weight:800; font-size:1.6rem; margin:0.6em 0 0.4em 0; "
+                        "border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;\">Vechime</p>",
+                        unsafe_allow_html=True,
+                    )
                     st.caption("Gestionare vechime instituție, vechime anterioară în muncă și overview + raport vechime PDF.")
 
                     # UI polishing - carduri și stilizare custom pentru secțiunea vechime
@@ -8971,7 +9082,7 @@ def page_angajati(conn: sqlite3.Connection):
                           padding: 16px 18px;
                           margin-bottom: 14px;
                         }
-                        .s-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+                        .s-title { font-size: 18px; font-weight: 700; margin: 0.4em 0 0.4em 0; border-bottom: 1px solid rgba(0,0,0,0.25); padding-bottom: 0.35em; }
                         .s-muted { color: var(--muted2, #CBD5E1); opacity: 1; font-size: 13px; }
                         .s-pill {
                           display:inline-block; padding: 6px 10px; border-radius: 999px;
@@ -9123,7 +9234,7 @@ def page_angajati(conn: sqlite3.Connection):
                     # =========================
 
                     st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">📅 Date angajare / plecare</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="s-title">Date angajare / plecare</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Aceste date controlează calculul automat pentru vechimea în instituție.</div>', unsafe_allow_html=True)
 
                     col1, col2, col3 = st.columns(3)
@@ -9170,7 +9281,7 @@ def page_angajati(conn: sqlite3.Connection):
 
                     # diana – auto-calc vechime instituție + blocare câmpuri
                     auto_calc_inst = st.checkbox(
-                        "🧮 Calculează automat vechimea în instituție",
+                        "Calculează automat vechimea în instituție",
                         value=True,
                         key=f"auto_calc_inst_{emp_id}",
                     )
@@ -9190,7 +9301,7 @@ def page_angajati(conn: sqlite3.Connection):
                         inst_den = int(v_inst_fd) if int(v_inst_fd) != 0 else 30
 
                     st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">🏢 Vechime în instituție</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="s-title">Vechime în instituție</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Dacă bifezi calcul automat, câmpurile devin doar afișaj.</div>', unsafe_allow_html=True)
 
                     if auto_calc_inst and data_ang_date:
@@ -9205,7 +9316,7 @@ def page_angajati(conn: sqlite3.Connection):
                     # =========================
 
                     st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">🧾 Vechime în muncă până la angajare</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="s-title">Vechime în muncă până la angajare</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Se salvează separat. Implicit este blocată până alegi „Modifică”.</div>', unsafe_allow_html=True)
 
                     # diana – lock/edit toggler pentru vechime anterioară
@@ -9216,11 +9327,11 @@ def page_angajati(conn: sqlite3.Connection):
                     cA, cB = st.columns([1, 3])
                     with cA:
                         if not st.session_state[ant_edit_key]:
-                            if st.button("✏️ Modifică", key=f"ant_edit_btn_{emp_id}"):
+                            if st.button("Modifică", key=f"ant_edit_btn_{emp_id}"):
                                 st.session_state[ant_edit_key] = True
                                 st.rerun()
                         else:
-                            if st.button("🔒 Blochează", key=f"ant_lock_btn_{emp_id}"):
+                            if st.button("Blochează", key=f"ant_lock_btn_{emp_id}"):
                                 st.session_state[ant_edit_key] = False
                                 st.rerun()
 
@@ -9250,7 +9361,7 @@ def page_angajati(conn: sqlite3.Connection):
                             )
 
                         save_ant = st.form_submit_button(
-                            "💾 Salvează vechime anterioară",
+                            "Salvează vechime anterioară",
                             disabled=disabled_ant,
                         )
 
@@ -9274,7 +9385,7 @@ def page_angajati(conn: sqlite3.Connection):
                     # =========================
 
                     st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">💾 Salvare vechime instituție / funcție</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="s-title">Salvare vechime instituție / funcție</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Aici salvezi valorile instituției (manual sau auto-calc) și vechimea în funcție.</div>', unsafe_allow_html=True)
 
                     with st.form(key=f"vechime_form_{emp_id}"):
@@ -9323,9 +9434,11 @@ def page_angajati(conn: sqlite3.Connection):
                                 key=f"inst_fd_{emp_id}",
                             )
 
-                        st.divider()
-
-                        st.markdown("#### 🏷️ Vechime în funcție")
+                        st.markdown(
+                            "<p style=\"color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; "
+                            "border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;\">Vechime în funcție</p>",
+                            unsafe_allow_html=True,
+                        )
                         f1, f2 = st.columns(2)
                         with f1:
                             functie_ani = st.number_input(
@@ -9346,9 +9459,7 @@ def page_angajati(conn: sqlite3.Connection):
                                 key=f"functie_luni_{emp_id}",
                             )
 
-                        st.divider()
-
-                        save_main = st.form_submit_button("💾 Salvează (instituție + funcție)")
+                        save_main = st.form_submit_button("Salvează (instituție + funcție)")
 
                     if save_main:
                         # diana – validare: data plecării nu poate fi înainte de data angajării
@@ -10454,79 +10565,67 @@ def page_angajati(conn: sqlite3.Connection):
     if st.session_state.get("ang_view", "list") != "list":
         return
 
-    st.markdown("<div class='emp-wrap'>", unsafe_allow_html=True)
-
-    # Header: titlu principal + acțiune, în stil unificat cu Organigramă
-    st.markdown(
-        """
-        <div class="page-header">
-          <h1 class="page-title">👥 Angajați</h1>
-          <div class="page-actions">
-        """,
-        unsafe_allow_html=True,
-    )
-    add_personal = st.button("+ ADAUGĂ PERSONAL", key="emp_add_personal")
-    if add_personal:
-        st.session_state["ang_view"] = "add"
+    def _ang_reset_filters() -> None:
+        for k in ("ang_q_ui", "ang_active_only_ui"):
+            st.session_state.pop(k, None)
+        st.session_state.pop("ang_applied_filters", None)
+        st.session_state.pop("ang_has_searched", None)
         st.session_state["ang_selected_id"] = None
         st.rerun()
-    st.markdown(
-        """
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    # Căutare – subtitlu aliniat cu formularul
-    st.markdown("<div class='filter-h3 emp-search-title'>Caută rapid</div>", unsafe_allow_html=True)
-
-    # State pentru filtre: aplicat doar la \"Caută\", nu live
+    # state filtre (aplicate explicit)
     if "ang_applied_filters" not in st.session_state:
-        st.session_state["ang_applied_filters"] = {}
+        st.session_state["ang_applied_filters"] = {
+            "search": "",
+            "active_only": True,
+        }
     if "ang_has_searched" not in st.session_state:
         st.session_state["ang_has_searched"] = False
 
-    # Reset filtre: curățăm state înainte de a randa formularul (evităm StreamlitAPIException)
     if st.session_state.get("ang_reset_pending"):
-        for k in ["ang_q_ui", "ang_nume_ui", "ang_prenume_ui", "ang_cnp_ui", "ang_marca_ui", "ang_active_only_ui"]:
+        for k in ("ang_q_ui", "ang_active_only_ui"):
             st.session_state.pop(k, None)
-        st.session_state.pop("ang_applied_filters", None)
-        st.session_state.pop("ang_has_searched", None)
+        st.session_state["ang_applied_filters"] = {
+            "search": "",
+            "active_only": True,
+        }
+        st.session_state["ang_has_searched"] = False
         st.session_state.pop("ang_reset_pending", None)
         st.rerun()
 
-    def _ang_reset_filters():
-        for k in ("ang_q_ui", "ang_nume_ui", "ang_prenume_ui", "ang_cnp_ui", "ang_marca_ui", "ang_active_only_ui"):
-            st.session_state.pop(k, None)
-        st.session_state.pop("ang_applied_filters", None)
-        st.session_state.pop("ang_has_searched", None)
-        st.rerun()
+    # 1) Titlu pagină
+    st.markdown('<h2 class="page-title ang-page-title">Angajați</h2>', unsafe_allow_html=True)
+    st.markdown("<div class='ang-gap-xs'></div>", unsafe_allow_html=True)
 
+    # 2) Buton principal
+    if st.button("Adaugă personal", key="emp_add_personal"):
+        st.session_state["ang_view"] = "add"
+        st.session_state["ang_selected_id"] = None
+        st.rerun()
+    st.markdown("<div class='ang-gap-sm'></div>", unsafe_allow_html=True)
+
+    # 3) + 4) Căutare rapidă + filtre compacte
     with st.form(key="ang_search_form"):
-        # Rând 1: bara de căutare (full width)
         st.text_input(
             "",
-            value=st.session_state.get("ang_q_ui", ""),
+            value=st.session_state.get("ang_q_ui", st.session_state["ang_applied_filters"].get("search", "")),
             key="ang_q_ui",
             placeholder="Nume, ID, prenume, CNP sau marcă (Enter pentru căutare)",
             label_visibility="collapsed",
         )
-        st.markdown("<div class='emp-vgap'></div>", unsafe_allow_html=True)
-        # Caută personal + Doar activi + Reset filtre pe același rând
-        c_btn, c_cb, c_reset = st.columns([0.22, 0.55, 0.23], gap="medium")
-        with c_btn:
-            submitted = st.form_submit_button("🔎 Caută personal", use_container_width=True)
-        with c_cb:
+
+        c_buttons, c_active = st.columns([0.30, 0.70])
+        with c_buttons:
+            submitted = st.form_submit_button("Aplică filtre", use_container_width=True, key="ang_btn_apply_filters")
+            reset_clicked = st.form_submit_button("Reset filtre", use_container_width=True, key="ang_btn_reset_filters")
+        with c_active:
             st.checkbox(
                 "Doar activi",
-                value=st.session_state.get("ang_active_only_ui", True),
+                value=st.session_state.get("ang_active_only_ui", st.session_state["ang_applied_filters"].get("active_only", True)),
                 key="ang_active_only_ui",
             )
-        with c_reset:
-            reset_clicked = st.form_submit_button("Reset filtre", use_container_width=True, key="ang_reset_filters_btn")
+    st.markdown("<div class='ang-gap-sm'></div>", unsafe_allow_html=True)
 
-    # La click pe Reset: setăm flag; curățarea se face la run următor, înainte de form
     if reset_clicked:
         st.session_state["ang_reset_pending"] = True
         st.rerun()
@@ -10534,10 +10633,6 @@ def page_angajati(conn: sqlite3.Connection):
     if submitted:
         st.session_state["ang_applied_filters"] = {
             "search": st.session_state.get("ang_q_ui", ""),
-            "nume": st.session_state.get("ang_nume_ui", ""),
-            "prenume": st.session_state.get("ang_prenume_ui", ""),
-            "cnp": st.session_state.get("ang_cnp_ui", ""),
-            "marca": st.session_state.get("ang_marca_ui", ""),
             "active_only": st.session_state.get("ang_active_only_ui", True),
         }
         st.session_state["ang_has_searched"] = True
@@ -10548,143 +10643,216 @@ def page_angajati(conn: sqlite3.Connection):
         conn,
         active_only=applied.get("active_only", True),
         search=applied.get("search", ""),
-        nume=applied.get("nume", ""),
-        prenume=applied.get("prenume", ""),
-        cnp=applied.get("cnp", ""),
-        marca=applied.get("marca", ""),
+        nume="",
+        prenume="",
+        cnp="",
+        marca="",
     )
 
     if df.empty:
         st.warning("Niciun angajat găsit pentru criteriile introduse.")
         st.session_state["ang_selected_id"] = None
-        st.button("Reset filtre", key="ang_reset_empty_btn", on_click=_ang_reset_filters)
-        st.markdown("</div>", unsafe_allow_html=True)  # close emp-wrap
         return
 
-    # CARD 2 – Tabel angajați (rezultate căutare)
-    cols_to_show = []
-    for col in ["id", "marca", "last_name", "first_name", "cnp", "activ"]:
-        if col in df.columns:
-            cols_to_show.append(col)
-
+    # 5) Tabel angajați
+    cols_to_show = [c for c in ["id", "marca", "last_name", "first_name", "cnp", "activ"] if c in df.columns]
     dfv = df[cols_to_show].copy()
-
-    # Pretty headers
-    rename = {}
-    if "id" in dfv.columns:
-        rename["id"] = "ID"
-    if "last_name" in dfv.columns:
-        rename["last_name"] = "Nume"
-    if "first_name" in dfv.columns:
-        rename["first_name"] = "Prenume"
-    if "cnp" in dfv.columns:
-        rename["cnp"] = "CNP"
-    if "marca" in dfv.columns:
-        rename["marca"] = "Marcă"
-    if "activ" in dfv.columns:
-        rename["activ"] = "Activ"
-    dfv = dfv.rename(columns=rename)
-
-    st.markdown("<div class='emp-card emp-card-table'>", unsafe_allow_html=True)
-    st.markdown("#### Tabel angajați")
+    dfv = dfv.rename(columns={
+        "id": "ID",
+        "marca": "Marcă",
+        "last_name": "Nume",
+        "first_name": "Prenume",
+        "cnp": "CNP",
+        "activ": "Activ",
+    })
     st.caption(f"Număr angajați: {len(df)}")
+    st.markdown("<div class='ang-gap-xs'></div>", unsafe_allow_html=True)
 
-    # Selectare angajat (prin selectbox pe ID) – deasupra tabelului
     recs = df.to_dict("records")
     options = [int(r.get("id")) for r in recs if r.get("id") is not None]
     if not options:
         st.warning("Nu am găsit ID-uri valide în tabela employees.")
         return
 
-    def _fmt_emp(emp_id_val: int) -> str:
-        rr = next((r for r in recs if int(r.get("id")) == int(emp_id_val)), None)
-        if not rr:
-            return str(emp_id_val)
-        return f"{rr.get('last_name','')} {rr.get('first_name','')} | CNP: {rr.get('cnp','')} | Marcă: {rr.get('marca','')}"
+    def _sync_angajati_selection_from_table(event_obj) -> int | None:
+        """Sursa unică de adevăr: selecția din tabel -> ang_selected_id."""
+        if event_obj and getattr(event_obj, "selection", None) and getattr(event_obj.selection, "rows", None):
+            rows = event_obj.selection.rows or []
+            if rows:
+                row_idx = rows[0]
+                if 0 <= row_idx < len(recs):
+                    return int(recs[row_idx].get("id"))
+            return None
+        return None
 
-    # păstrăm selecția când se schimbă filtrele
-    sel_default_id = st.session_state.get("ang_selected_id")
-    if sel_default_id in options:
-        sel_index = options.index(sel_default_id)
-    else:
-        sel_index = 0
-
-    st.markdown(
-        "<p style='margin:0 0 10px 0; font-size:0.95rem; color:rgba(248,250,252,0.92);'>"
-        "Selectați un rând în tabel (click sau Enter) – angajatul apare în Acțiuni; apoi apăsați <strong>Deschide fișa</strong>."
-        "</p>",
-        unsafe_allow_html=True,
-    )
-    # Tabel cu selecție la click pe rând – procesăm selecția ÎNAINTE de selectbox ca Acțiunile să se actualizeze
+    # randare tabel + sincronizare selecție
+    table_selected_id: int | None = None
     try:
         event = st.dataframe(
             dfv,
             use_container_width=True,
             hide_index=True,
-            height=360,
+            height=370,
             on_select="rerun",
             selection_mode="single-row",
             key="ang_df_select",
         )
-        if event and getattr(event, "selection", None) and getattr(event.selection, "rows", None) and event.selection.rows:
-            row_idx = event.selection.rows[0]
-            if 0 <= row_idx < len(recs):
-                new_id = int(recs[row_idx].get("id"))
-                if new_id != st.session_state.get("ang_selected_id"):
-                    st.session_state["ang_selected_id"] = new_id
-                    st.rerun()
+        table_selected_id = _sync_angajati_selection_from_table(event)
     except TypeError:
-        # Streamlit < 1.35 fără on_select/selection_mode
-        st.dataframe(dfv, use_container_width=True, hide_index=True, height=360)
+        st.dataframe(dfv, use_container_width=True, hide_index=True, height=370)
+    st.markdown("<div class='ang-gap-md'></div>", unsafe_allow_html=True)
 
-    # Selectare și din listă (sincronizat cu ang_selected_id)
-    sel_default_id = st.session_state.get("ang_selected_id")
-    if sel_default_id not in options:
-        sel_default_id = options[0] if options else None
-    if sel_default_id is not None:
-        sel_index = options.index(sel_default_id)
-    else:
-        sel_index = 0
-    sel_id = st.selectbox(
-        "Angajat selectat",
-        options=options,
-        format_func=_fmt_emp,
-        index=sel_index,
-        key="ang_select_id",
-    )
-    st.session_state["ang_selected_id"] = int(sel_id)
+    # Sursa unică: doar selecția din tabel actualizează ang_selected_id
+    if table_selected_id is not None:
+        if table_selected_id != st.session_state.get("ang_selected_id"):
+            st.session_state["ang_selected_id"] = table_selected_id
+            st.rerun()
+    elif st.session_state.get("ang_selected_id") not in options:
+        st.session_state["ang_selected_id"] = None
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # CARD 3 – Acțiuni: folosim întotdeauna ang_selected_id (din tabel sau din listă)
+    # 6) Angajat selectat + sumar
     sel_id = st.session_state.get("ang_selected_id")
     sel_rec = next((r for r in recs if int(r.get("id")) == int(sel_id)), None) if sel_id else None
-    sel_name = f"{sel_rec.get('last_name', '')} {sel_rec.get('first_name', '')}".strip() if sel_rec else ""
-    sel_cnp = sel_rec.get("cnp", "") if sel_rec else ""
-    sel_marca = sel_rec.get("marca", "") if sel_rec else ""
-    st.markdown("<div class='emp-card emp-actions'>", unsafe_allow_html=True)
-    st.markdown("#### Acțiuni")
-    st.markdown(
-        f"**Angajat selectat:** {sel_name}  \n"
-        f"CNP: {sel_cnp} · Marcă: {sel_marca}"
-    )
 
-    if st.button("👁 Deschide fișa", key="ang_open_detail"):
-        st.session_state["ang_view"] = "detail"
-        st.session_state["ang_scroll_to_top"] = True
-        st.rerun()
+    # 7) Bottom section reconstruit: Angajat selectat + Acțiuni
+    def _inject_angajati_bottom_section_css() -> None:
+        st.markdown(
+            """
+            <style>
+            .ang-bottom-section{
+              margin-top: 12px;
+              width: fit-content;
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+            }
+            .ang-bottom-box{
+              border: none !important;
+              border-radius: 8px;
+              background: transparent !important;
+              padding: 10px 12px;
+              box-sizing: border-box;
+              box-shadow: none !important;
+              width: fit-content;
+              min-width: 300px;
+              max-width: 330px;
+            }
+            .ang-bottom-title{
+              margin: 0 0 10px 0 !important;
+              margin-top: 0 !important;
+              font-weight: 800;
+              font-size: 1.02rem;
+              color: rgba(248,250,252,0.98);
+            }
+            .ang-selected-rows{
+              margin-top: 12px !important;
+              display: flex;
+              flex-direction: column;
+              gap: 0 !important;
+            }
+            .ang-selected-row{
+              margin: 0 0 10px 0 !important;
+              font-size: 0.96rem;
+              color: rgba(203,213,225,0.98);
+              text-align: left;
+              line-height: 1.35;
+            }
+            .ang-selected-row:last-child{
+              margin-bottom: 0 !important;
+            }
+            .ang-actions-stack{
+              margin-top: 12px !important;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 14px;
+            }
+            .ang-actions-stack .stButton{
+              margin: 0 !important;
+            }
+            .st-key-ang_btn_open button,
+            .st-key-ang_btn_edit button,
+            .st-key-ang_btn_delete button{
+              width: 220px !important;
+              min-width: 220px !important;
+              max-width: 220px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              max-height: 42px !important;
+              border-radius: 12px !important;
+              display: block !important;
+              margin: 0 auto !important;
+            }
+            .st-key-ang_btn_apply_filters button,
+            .st-key-ang_btn_reset_filters button,
+            .st-key-emp_add_personal button{
+              width: 220px !important;
+              min-width: 220px !important;
+              max-width: 220px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              max-height: 42px !important;
+            }
+            .st-key-emp_add_personal button{
+              margin-left: 16px !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    # Modifică personal, apoi Șterge personal dedesubt
-    if st.button("✏️ Modifică personal", key="ang_edit_btn"):
-        st.session_state["ang_view"] = "edit"
-        st.rerun()
-    if st.button("🗑 Șterge personal", key="ang_delete_btn"):
-        st.session_state["ang_view"] = "delete"
-        st.rerun()
+    def _render_angajat_selectat_box(emp: dict | None) -> None:
+        st.markdown("<div class='ang-bottom-box'>", unsafe_allow_html=True)
+        st.markdown("<p class='ang-bottom-title'>Angajat selectat</p>", unsafe_allow_html=True)
+        if emp:
+            full_name = f"{emp.get('last_name', '')} {emp.get('first_name', '')}".strip() or "—"
+            emp_id_text = emp.get("id", "—")
+            st.markdown(
+                f"""
+                <div class='ang-selected-rows'>
+                  <div class='ang-selected-row'><strong>Nume:</strong> {full_name} (ID: {emp_id_text})</div>
+                  <div class='ang-selected-row'><strong>CNP:</strong> {emp.get('cnp', '') or '—'}</div>
+                  <div class='ang-selected-row'><strong>Marcă:</strong> {emp.get('marca', '') or '—'}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <div class='ang-selected-rows'>
+                  <div class='ang-selected-row'>Nume: —</div>
+                  <div class='ang-selected-row'>CNP: —</div>
+                  <div class='ang-selected-row'>Marcă: —</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
+    def _render_angajati_actions_box(emp_id: int | None) -> None:
+        has_emp = bool(emp_id)
+        st.markdown("<div class='ang-bottom-box'>", unsafe_allow_html=True)
+        st.markdown("<p class='ang-bottom-title'>Acțiuni</p>", unsafe_allow_html=True)
+        st.markdown("<div class='ang-actions-stack'>", unsafe_allow_html=True)
+        if st.button("Deschide fișa", key="ang_btn_open", disabled=not has_emp):
+            st.session_state["ang_view"] = "detail"
+            st.session_state["ang_scroll_to_top"] = True
+            st.rerun()
+        if st.button("Modifică personal", key="ang_btn_edit", disabled=not has_emp):
+            st.session_state["ang_view"] = "edit"
+            st.rerun()
+        if st.button("Șterge personal", key="ang_btn_delete", disabled=not has_emp):
+            st.session_state["ang_view"] = "delete"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    _inject_angajati_bottom_section_css()
+    st.markdown("<div class='ang-bottom-section'>", unsafe_allow_html=True)
+    _render_angajat_selectat_box(sel_rec if sel_rec else None)
+    _render_angajati_actions_box(int(sel_id) if sel_id else None)
     st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)  # close emp-wrap
 
 def sync_employees_from_stat_functii(conn: sqlite3.Connection) -> int:
     """Dacă în stat_functii există coloane relevante, actualizează employees pentru a reflecta schimbările.
@@ -11128,26 +11296,6 @@ def insert_dosar_acces(
 def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
     st.markdown('<h2 class="page-title">Dosar profesional</h2>', unsafe_allow_html=True)
 
-    # Breadcrumb sus
-    st.markdown(
-        f"<div class='dosar-breadcrumb'>Dosar profesional / <span>{sub_menu}</span></div>",
-        unsafe_allow_html=True,
-    )
-
-    # Section header vizual pentru secțiunea activă
-    st.markdown(
-        f"""
-        <div class="dosar-section">
-          <div class="pill">📁</div>
-          <div class="body">
-            <div class="title">{sub_menu}</div>
-            <div class="hint">Secțiune activă din dosarul profesional</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     # --------- SUS: FILTRE + LISTĂ ANGAJAȚI ---------
     st.markdown("#### Filtru angajați")
 
@@ -11176,11 +11324,34 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
         marca=filter_marca,
     )
 
-    st.caption("Listă angajați")
-
     selected_emp = None
+    open_key = "dosar_open_selected"
     if employees_df.empty:
         st.warning("Nu s-a găsit niciun angajat pentru criteriile curente.")
+        st.markdown("#### Adaugă angajat nou")
+        with st.form("dosar_add_new_emp_compact"):
+            c1, c2 = st.columns(2)
+            with c1:
+                new_marca = st.text_input("Marcă")
+                new_last = st.text_input("Nume")
+            with c2:
+                new_first = st.text_input("Prenume")
+                new_cnp = st.text_input("CNP")
+            add_ok = st.form_submit_button("Adaugă angajat nou")
+        if add_ok:
+            payload = {
+                "marca": (new_marca or "").strip(),
+                "last_name": (new_last or "").strip(),
+                "first_name": (new_first or "").strip(),
+                "cnp": (new_cnp or "").strip(),
+                "activ": 1,
+            }
+            if not payload["last_name"] or not payload["first_name"]:
+                st.error("Completează cel puțin Nume și Prenume.")
+            else:
+                emp_id_new = insert_employee(conn, payload)
+                st.success(f"Angajat nou salvat (ID = {emp_id_new}).")
+                st.rerun()
         return
     else:
         records = employees_df.to_dict("records")
@@ -11202,6 +11373,10 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
             key="emp_select_box",
         )
         st.session_state["selected_emp_idx"] = selected_idx
+        prev_idx = st.session_state.get("dosar_prev_selected_idx")
+        if prev_idx != selected_idx:
+            st.session_state[open_key] = False
+        st.session_state["dosar_prev_selected_idx"] = selected_idx
         selected_emp = records[selected_idx]
         # Folosim angajatul selectat ca bază; dacă există un dosar salvat, îl reîncărcăm peste.
         emp_dosar = selected_emp
@@ -11226,136 +11401,15 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
         st.markdown(
             f"**Dosar angajat:** {nume_complet} | {cnp_val} | {marca_val}"
         )
-
-    # --------- IMEDIAT DUPĂ ALEGERE: ADAUGĂ ANGAJAT NOU ---------
-    st.markdown("#### Adaugă angajat nou")
-
-    with st.expander("Formular angajat nou", expanded=False):
-        new = {}
-        # Identificare de bază (2 coloane)
-        c_id1, c_id2 = st.columns(2)
-        with c_id1:
-            new["marca"] = st.text_input("Marcă", key="new_marca")
-            new["last_name"] = st.text_input("Nume", key="new_last_name")
-        with c_id2:
-            new["first_name"] = st.text_input("Prenume", key="new_first_name")
-            new["cnp"] = st.text_input("CNP", key="new_cnp")
-
-        st.markdown("**Contact**")
-        c_contact1, c_contact2 = st.columns(2)
-        with c_contact1:
-            new["telefon_fix"] = st.text_input("Telefon fix", key="new_telefon_fix")
-            new["mobil"] = st.text_input("Telefon mobil", key="new_mobil")
-        with c_contact2:
-            new["email"] = st.text_input("Email", key="new_email")
-
-        st.markdown("**Adresă**")
-        c_addr1, c_addr2 = st.columns(2)
-        with c_addr1:
-            new["strada"] = st.text_input("Strada", key="new_strada")
-            new["numar"] = st.text_input("Număr", key="new_numar")
-            new["bloc"] = st.text_input("Bloc", key="new_bloc")
-            new["scara"] = st.text_input("Scară", key="new_scara")
-        with c_addr2:
-            new["apartament"] = st.text_input("Apartament", key="new_apartament")
-            new["cod_postal"] = st.text_input("Cod poștal", key="new_cod_postal")
-            new["localitate"] = st.text_input("Localitate", key="new_localitate")
-            new["judet"] = st.text_input("Județ", key="new_judet")
-
-        st.markdown("**Contract (scurt)**")
-        c_ctr1, c_ctr2 = st.columns(2)
-        with c_ctr1:
-            new["functie"] = st.text_input("Funcție", key="new_functie")
-            new["departament"] = st.text_input("Departament", key="new_departament")
-            new["data_angajare"] = st.text_input(
-                "Data angajare (YYYY-MM-DD)", key="new_data_angajare"
-            )
-        with c_ctr2:
-            new["tip_contract"] = st.text_input("Tip contract", key="new_tip_contract")
-            new["salariu_baza"] = st.number_input(
-                "Salariu de bază", min_value=0.0, step=1.0, key="new_salariu_baza"
-            )
-
-        st.markdown("**Studii / Observații**")
-        new["studii"] = st.text_area("Studii", key="new_studii")
-        new["profesie"] = ""
-        new["calificare"] = ""
-        new["observatii"] = st.text_area("Observații", key="new_obs")
-
-        # câmpuri dosar – inițial goale
-        new["dosar_nr"] = ""
-        new["dosar_functionar_public"] = ""
-        new["dosar_data_intocmire"] = ""
-        new["dosar_autoritate"] = ""
-        new["dosar_intocmit_nume"] = ""
-        new["dosar_intocmit_functie"] = ""
-        new["dosar_intocmit_semnatura"] = ""
-        new["dosar_modificari_nume"] = ""
-        new["dosar_modificari_functie"] = ""
-        new["dosar_modificari_semnatura"] = ""
-        new["dosar_certificare_nume"] = ""
-        new["dosar_certificare_functie"] = ""
-        new["dosar_certificare_semnatura"] = ""
-
-        # extra
-        new["stare_civila"] = ""
-        new["nr_copii"] = 0
-        new["loc_munca"] = ""
-        new["departament_organizatoric"] = ""
-        new["functie_contract"] = ""
-        new["tip_norma"] = ""
-        new["program_munca"] = ""
-        new["ci_tip_act"] = ""
-        new["ci_serie"] = ""
-        new["ci_numar"] = ""
-        new["ci_eliberat_de"] = ""
-        new["ci_data_eliberarii"] = ""
-        new["activitate_in_afara_functiei"] = ""
-        new["activitate_in_cadru_institutie"] = ""
-        new["situatia_drepturi_salariale"] = ""
-        new["situatia_concedii"] = ""
-        new["situatia_disciplinara"] = ""
-        new["registru_numar"] = ""
-        new["registru_data"] = ""
-        new["registru_observatii"] = ""
-        new["activ"] = 1
-
-        if st.button("Salvează angajat nou", key="btn_save_new_emp"):
-            import re as _re
-
-            errors: list[str] = []
-
-            # Validări simple: doar litere / doar cifre
-            def _only_letters(val: str, label: str):
-                txt = (val or "").strip()
-                if not txt:
-                    return
-                if not _re.fullmatch(r"[A-Za-zĂÂÎȘŞȚŢăâîșşțţ \-]+", txt):
-                    errors.append(f"{label} trebuie să conțină doar litere.")
-
-            def _only_digits(val: str, label: str):
-                txt = (val or "").strip()
-                if not txt:
-                    return
-                if not txt.isdigit():
-                    errors.append(f"{label} trebuie să conțină doar cifre.")
-
-            _only_letters(new["last_name"], "Nume")
-            _only_letters(new["first_name"], "Prenume")
-
-            _only_digits(new["numar"], "Număr")
-            _only_digits(new["bloc"], "Bloc")
-            _only_digits(new["cod_postal"], "Cod poștal")
-
-            if not new["last_name"] or not new["first_name"]:
-                errors.append("Completează cel puțin Nume și Prenume.")
-
-            if errors:
-                for msg in errors:
-                    st.error(msg)
-            else:
-                emp_id_new = insert_employee(conn, new)
-                st.success(f"Angajat nou salvat (ID = {emp_id_new}).")
+    if st.button("📂 Deschide dosarul angajatului selectat", key="dosar_open_btn"):
+        st.session_state[open_key] = True
+        st.rerun()
+    if st.session_state.get(open_key, False):
+        if st.button("📁 Închide dosarul", key="dosar_close_btn"):
+            st.session_state[open_key] = False
+            st.rerun()
+    if not st.session_state.get(open_key, False):
+        return
 
     st.markdown("---")
 
@@ -14449,7 +14503,103 @@ def cyto_elements_to_payload(elements: list[dict]) -> dict:
 def page_organigrama(conn):
     # Marker pentru a putea controla padding-ul doar pe Organigramă
     st.markdown('<span id="org-scope"></span>', unsafe_allow_html=True)
-    st.markdown('<h2 class="page-title">Organigramă</h2>', unsafe_allow_html=True)
+    def _inject_organigrama_page_css() -> None:
+        st.markdown(
+            """
+            <style>
+            section.main:has(#org-scope) .org-page .org-title{
+              margin: 0 0 0.5rem 0 !important;
+              padding: 0 !important;
+            }
+            section.main:has(#org-scope) .org-page .org-toolbar,
+            section.main:has(#org-scope) .org-page .org-filters,
+            section.main:has(#org-scope) .org-page .org-canvas,
+            section.main:has(#org-scope) .org-page .org-bottom{
+              border: 1px solid rgba(148,163,184,0.22);
+              border-radius: 8px;
+              background: rgba(15,23,42,0.18);
+              padding: 12px 14px;
+              margin: 0 0 12px 0;
+              text-align: left;
+            }
+            section.main:has(#org-scope) .org-page .org-filters{
+              margin-bottom: 18px;
+            }
+            section.main:has(#org-scope) .org-page .org-toolbar{
+              max-width: 220px;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            }
+            section.main:has(#org-scope) .org-page .org-bottom{ max-width: 560px; }
+            section.main:has(#org-scope) .org-page .org-section-title{
+              margin: 0 0 6px 0;
+              font-size: 1.18rem;
+              font-weight: 900;
+              color: rgba(248,250,252,0.96);
+              letter-spacing: 0.01em;
+            }
+            section.main:has(#org-scope) .org-page .org-section-desc{
+              margin: 0;
+              max-width: 860px;
+              color: rgba(203,213,225,0.90);
+              font-size: 0.94rem;
+              line-height: 1.45;
+            }
+            section.main:has(#org-scope) .org-page .org-view-radio{
+              margin-top: 12px;
+            }
+            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] [role="radiogroup"]{
+              gap: 12px !important;
+            }
+            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] label p,
+            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] label span{
+              font-weight: 800 !important;
+              color: rgba(248,250,252,0.96) !important;
+            }
+            section.main:has(#org-scope) .org-page div[data-testid="stTabs"] > div[role="tablist"]{
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 10px !important;
+              max-width: 220px !important;
+              margin-bottom: 12px !important;
+            }
+            section.main:has(#org-scope) .org-page div[data-testid="stTabs"] > div[role="tablist"] button[role="tab"]{
+              width: 220px !important;
+              min-width: 220px !important;
+              max-width: 220px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              max-height: 42px !important;
+              border-radius: 12px !important;
+              justify-content: flex-start !important;
+              text-align: left !important;
+              font-weight: 700 !important;
+            }
+            section.main:has(#org-scope) .org-page .org-selected-row{
+              margin: 0 0 6px 0;
+              color: rgba(203,213,225,0.98);
+            }
+            section.main:has(#org-scope) .org-page .org-selected-row:last-child{ margin-bottom: 0; }
+            .st-key-org_btn_top_refresh button,
+            .st-key-org_btn_clear_selection button,
+            .st-key-org_btn_sel_refresh button,
+            .st-key-org_btn_sel_clear button{
+              width: 220px !important;
+              min-width: 220px !important;
+              max-width: 220px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              max-height: 42px !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    _inject_organigrama_page_css()
+    st.markdown("<div class='org-page'>", unsafe_allow_html=True)
+    st.markdown('<h2 class="page-title org-title">Organigramă</h2>', unsafe_allow_html=True)
 
     try:
         ensure_org_schema(conn)
@@ -14562,14 +14712,18 @@ def page_organigrama(conn):
             df_units["type"] = None
 
         # ===== PANOU CONTROL (sus) – doar View + Export (fără căutare/filtre în UI) =====
-        st.markdown('<div class="s-card">', unsafe_allow_html=True)
+        st.markdown('<div class="org-filters">', unsafe_allow_html=True)
 
         # Variabile interne pentru eventuale filtre viitoare (UI ascuns momentan)
         q = ""
         sel_types: list[str] = []
 
-        st.markdown("### 🎛️ Mod de vizualizare")
-        st.caption("Alege cum dorești să fie afișată organigrama.")
+        st.markdown("<div class='org-section-title'>Mod de vizualizare</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<p class='org-section-desc'>Alege cum dorești să fie afișată organigrama.</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div class='org-view-radio'>", unsafe_allow_html=True)
         view_mode = st.radio(
             "",
             ["Interactivă", "Ierarhică"],
@@ -14577,6 +14731,7 @@ def page_organigrama(conn):
             key="org_view_mode",
             label_visibility="collapsed",
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # Exporturile sunt gestionate mai jos, în secțiunea unificată „Export selecție”
         st.markdown("</div>", unsafe_allow_html=True)
@@ -14590,10 +14745,11 @@ def page_organigrama(conn):
             df_view = df_view[df_view["name"].astype(str).str.lower().str.contains(qq)]
 
         # ===== ORGANIGRAMĂ – full width sub panoul de control =====
-        st.markdown('<div class="s-card">', unsafe_allow_html=True)
-        st.markdown("### 🧩 Organigramă", unsafe_allow_html=True)
-        st.caption(
-            "Vizualizează structura organizațională completă și accesează atât varianta ierarhică, cât și cea interactivă."
+        st.markdown('<div class="org-canvas">', unsafe_allow_html=True)
+        st.markdown("<div class='org-section-title'>Organigramă</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<p class='org-section-desc'>Vizualizează structura organizațională completă și accesează atât varianta ierarhică, cât și cea interactivă.</p>",
+            unsafe_allow_html=True,
         )
 
         if view_mode == "Ierarhică":
@@ -15070,6 +15226,67 @@ def page_organigrama(conn):
                     st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("</div>", unsafe_allow_html=True)
+
+        # ===== ELEMENT SELECTAT + ACȚIUNI (compact, similar cu Angajați) =====
+        emp_q_bottom = st.query_params.get("emp_id")
+        pos_q_bottom = st.query_params.get("pos_id")
+        unit_q_bottom = st.query_params.get("unit_id")
+        try:
+            emp_id_bottom = int(str(emp_q_bottom)) if emp_q_bottom is not None else None
+        except Exception:
+            emp_id_bottom = None
+        try:
+            pos_id_bottom = int(str(pos_q_bottom)) if pos_q_bottom is not None else None
+        except Exception:
+            pos_id_bottom = None
+        try:
+            unit_id_bottom = int(str(unit_q_bottom)) if unit_q_bottom is not None else None
+        except Exception:
+            unit_id_bottom = None
+
+        st.markdown("<div class='org-bottom'>", unsafe_allow_html=True)
+        st.markdown("<div class='org-section-title'>Element selectat</div>", unsafe_allow_html=True)
+        if emp_id_bottom is not None:
+            bundle_bottom = load_employee_bundle(get_db_path(), int(emp_id_bottom))
+            emp_bottom = bundle_bottom.get("employee") or {}
+            emp_name_bottom = f"{(emp_bottom.get('last_name') or '').strip()} {(emp_bottom.get('first_name') or '').strip()}".strip() or f"ID {emp_id_bottom}"
+            st.markdown(f"<div class='org-selected-row'><strong>Persoană:</strong> {emp_name_bottom}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>CNP:</strong> {emp_bottom.get('cnp') or '—'}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>Marcă:</strong> {emp_bottom.get('marca') or '—'}</div>", unsafe_allow_html=True)
+        elif pos_id_bottom is not None:
+            row_pos_bottom = conn.execute(
+                "SELECT op.title, ou.name FROM org_positions op LEFT JOIN org_units ou ON ou.id = op.unit_id WHERE op.id = ?",
+                (int(pos_id_bottom),),
+            ).fetchone()
+            st.markdown("<div class='org-selected-row'><strong>Tip:</strong> Post</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>Denumire:</strong> {(row_pos_bottom[0] if row_pos_bottom else '—') or '—'}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>Unitate:</strong> {(row_pos_bottom[1] if row_pos_bottom else '—') or '—'}</div>", unsafe_allow_html=True)
+        elif unit_id_bottom is not None:
+            row_unit_bottom = conn.execute(
+                "SELECT name, type, parent_id FROM org_units WHERE id = ?",
+                (int(unit_id_bottom),),
+            ).fetchone()
+            st.markdown("<div class='org-selected-row'><strong>Tip:</strong> Unitate</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>Denumire:</strong> {(row_unit_bottom[0] if row_unit_bottom else '—') or '—'}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='org-selected-row'><strong>Părinte:</strong> {(row_unit_bottom[2] if row_unit_bottom else '—') if row_unit_bottom else '—'}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='org-selected-row'>Nicio selecție activă.</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div class='org-bottom'>", unsafe_allow_html=True)
+        st.markdown("<div class='org-section-title'>Acțiuni</div>", unsafe_allow_html=True)
+        if st.button("Reîmprospătează", key="org_btn_sel_refresh"):
+            st.rerun()
+        if st.button("Curăță selecția", key="org_btn_sel_clear", disabled=not any(v is not None for v in (emp_id_bottom, pos_id_bottom, unit_id_bottom))):
+            qs_bottom = dict(st.query_params)
+            qs_bottom.pop("emp_id", None)
+            qs_bottom.pop("pos_id", None)
+            qs_bottom.pop("unit_id", None)
+            st.query_params.clear()
+            for k, v in qs_bottom.items():
+                st.query_params[k] = v
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ===== EXPORT – ORGANIGRAMĂ IERARHICĂ COMPLETĂ (TXT / DOCX) =====
         st.markdown("### 📤 Export organigramă ierarhică")
@@ -15643,6 +15860,7 @@ def page_organigrama(conn):
                     )
 
         st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # CENTRALIZATOR CONCEDII (din PONTAJ)
 # -------------------------------------------------------------
@@ -16537,6 +16755,26 @@ def main():
     # st.set_page_config(page_title=APP_TITLE, layout="wide")
     apply_premium_theme()
     apply_centered_layout(1280)
+    # Spacing global: primul conținut util începe imediat sub top bar
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stMain"] .block-container { padding-top: 0.5rem !important; margin-top: 0 !important; }
+        div[data-testid="stAppViewBlockContainer"] { padding-top: 0.5rem !important; margin-top: 0 !important; }
+        div[data-testid="stMainBlockContainer"] { padding-top: 0.5rem !important; margin-top: 0 !important; }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
+        section[data-testid="stMain"] div[data-testid="stVerticalBlock"] > div:first-child {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+          min-height: 0 !important;
+        }
+        section[data-testid="stMain"] h1,
+        section[data-testid="stMain"] h2,
+        section[data-testid="stMain"] h3 { margin-top: 0 !important; padding-top: 0 !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     cfg = load_config()
     db_path = cfg.get("db_path", DB_PATH_DEFAULT)
@@ -16552,7 +16790,7 @@ def main():
 
     require_login(conn, cfg)
 
-    # După login, afișăm la loc header-ul Streamlit și title-ul paginii.
+    # După login, afișăm la loc header-ul Streamlit.
     if st.session_state.get("logged_in", False):
         st.markdown(
             """
@@ -16562,7 +16800,6 @@ def main():
             """,
             unsafe_allow_html=True,
         )
-        # Titlul global cu numele aplicației a fost eliminat pentru a elibera spațiu vertical.
 
     # Sidebar: brand
     st.sidebar.markdown(
