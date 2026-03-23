@@ -6875,6 +6875,7 @@ def _render_employee_form_fields(
     single_column: bool = False,
     fine_section_titles: bool = False,
     parallel_groups: bool = False,
+    section_title_class: str | None = None,
 ) -> dict:
     """Randare câmpuri + colectare valori (dinamic, după schema DB)."""
     out = {}
@@ -6894,7 +6895,8 @@ def _render_employee_form_fields(
     def _render_group(gname: str, gcols: list[str]) -> None:
         with st.container():
             if fine_section_titles:
-                st.markdown(f'<div class="emp-block-title">{gname}</div>', unsafe_allow_html=True)
+                cls = "emp-block-title" if not section_title_class else f"emp-block-title {section_title_class}"
+                st.markdown(f'<div class="{cls}">{gname}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f"### {gname}")
 
@@ -6922,7 +6924,7 @@ def _render_employee_form_fields(
 
                 with target:
                     if is_boolish(c):
-                        if single_column and prefix.startswith("ang_edit_"):
+                        if single_column and (prefix.startswith("ang_edit_") or prefix.startswith("ang_add")):
                             st.markdown(f"**{label}**")
                             out[c] = st.checkbox(
                                 "",
@@ -6933,12 +6935,18 @@ def _render_employee_form_fields(
                         else:
                             out[c] = st.checkbox(label, value=bool(val) if val is not None else True, key=key)
                     elif is_number(c):
+                        if prefix.startswith("ang_add"):
+                            out[c] = st.text_input(label, value="" if val in (None, "") else str(val), key=key)
+                            continue
                         try:
                             v0 = int(val) if val not in (None, "") else 0
                         except Exception:
                             v0 = 0
                         out[c] = st.number_input(label, min_value=0, step=1, value=v0, key=key)
                     elif is_real(c):
+                        if prefix.startswith("ang_add"):
+                            out[c] = st.text_input(label, value="" if val in (None, "") else str(val), key=key)
+                            continue
                         try:
                             v0 = float(val) if val not in (None, "") else 0.0
                         except Exception:
@@ -9567,13 +9575,74 @@ def page_angajati(conn: sqlite3.Connection):
             st.markdown(
                 """
                 <style>
-                section.main:has(#emp-scope) .st-key-ang_add_form{
-                  max-width: 980px !important;
+                .st-key-ang_add_panel{
+                  max-width: 100% !important;
                   margin-left: 0 !important;
                   margin-right: auto !important;
                 }
-                section.main:has(#emp-scope) .st-key-ang_add_form [data-testid="stHorizontalBlock"]{
+                .st-key-ang_add_panel [data-testid="stHorizontalBlock"]{
                   justify-content: flex-start !important;
+                }
+                .st-key-ang_add_panel .stCheckbox [data-testid="stCheckbox"]{
+                  display: flex !important;
+                  flex-direction: row !important;
+                  align-items: center !important;
+                  gap: 8px !important;
+                }
+                .st-key-ang_add_panel [class*="st-key-ang_add_cnp"] [data-testid="stCaptionContainer"]{
+                  margin-top: -6px !important;
+                  margin-bottom: 4px !important;
+                }
+                .st-key-ang_add_panel [class*="st-key-ang_add_cnp"] [data-testid="stCaptionContainer"] p{
+                  margin-top: 0 !important;
+                  margin-bottom: 0 !important;
+                  line-height: 1.2 !important;
+                }
+                .st-key-ang_add_panel .stTextInput,
+                .st-key-ang_add_panel .stNumberInput,
+                .st-key-ang_add_panel .stTextArea,
+                .st-key-ang_add_panel .stSelectbox,
+                .st-key-ang_add_panel .stDateInput,
+                .st-key-ang_add_panel .stCheckbox,
+                .st-key-ang_add_panel [data-testid="stTextInputRootElement"],
+                .st-key-ang_add_panel [data-testid="stNumberInputRootElement"]{
+                  max-width: 58% !important;
+                  width: 58% !important;
+                  margin-left: 0 !important;
+                  margin-right: auto !important;
+                }
+                .st-key-ang_add_panel [class*="st-key-ang_add_nr_copii"] [data-testid="stNumberInputRootElement"],
+                .st-key-ang_add_panel [class*="st-key-ang_add_salariu_baza"] [data-testid="stNumberInputRootElement"]{
+                  max-width: 58% !important;
+                  width: 58% !important;
+                  margin-left: 0 !important;
+                  margin-right: auto !important;
+                }
+                .st-key-ang_add_panel [class*="st-key-ang_add_nr_copii"] [data-testid="stNumberInputRootElement"] > div,
+                .st-key-ang_add_panel [class*="st-key-ang_add_salariu_baza"] [data-testid="stNumberInputRootElement"] > div{
+                  max-width: 100% !important;
+                  width: 100% !important;
+                }
+                .emp-block-title-add{
+                  position: relative;
+                  font-weight: 800 !important;
+                  color: rgba(241,245,249,0.98) !important;
+                  padding-bottom: 8px !important;
+                  margin-bottom: 12px !important;
+                }
+                .emp-block-title-add::after{
+                  content: "";
+                  display: block;
+                  width: min(50vw, 420px);
+                  max-width: 100%;
+                  height: 1px;
+                  margin-top: 7px;
+                  background: linear-gradient(
+                    90deg,
+                    rgba(148,163,184,0.46) 0%,
+                    rgba(148,163,184,0.24) 55%,
+                    rgba(148,163,184,0.02) 100%
+                  );
                 }
                 .st-key-ang_add_save_btn button,
                 .st-key-ang_add_cancel_btn button{
@@ -9589,45 +9658,54 @@ def page_angajati(conn: sqlite3.Connection):
                 unsafe_allow_html=True,
             )
             st.subheader("➕ Adaugă angajat")
+            st.markdown("<div class='emp-thin-guide-line'></div>", unsafe_allow_html=True)
             st.info("Câmpuri obligatorii pentru înregistrare nouă: Marcă, Nume, Prenume și CNP (valid).")
-            with st.form("ang_add_form"):
-                values = _render_employee_form_fields({}, cols, prefix="ang_add")
+            with st.container(key="ang_add_panel"):
+                with st.form("ang_add_form"):
+                    values = _render_employee_form_fields(
+                        {},
+                        cols,
+                        prefix="ang_add",
+                        single_column=True,
+                        fine_section_titles=True,
+                        section_title_class="emp-block-title-add",
+                    )
 
-                # Previzualizare constantă a datelor extrase din CNP în secțiunea „Date de bază”
-                cnp_state = str(st.session_state.get("ang_add_cnp", "") or "").strip()
-                st.markdown("#### Date extrase din CNP")
-                if not cnp_state:
-                    st.caption("Completează CNP-ul pentru a vedea aici data nașterii, sexul și județul extrase automat.")
-                else:
-                    info = decode_cnp(cnp_state, strict_county=False, allow_s_9=False)
-                    if info.valid:
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.text_input(
-                                "Data nașterii (din CNP)",
-                                value=info.birth_date.strftime("%d.%m.%Y") if info.birth_date else "",
-                                key="ang_add_cnp_birth",
-                                disabled=True,
-                            )
-                        with col2:
-                            st.text_input(
-                                "Sex (din CNP)",
-                                value=("Masculin" if info.sex == "M" else "Feminin") if info.sex else "",
-                                key="ang_add_cnp_sex",
-                                disabled=True,
-                            )
-                        with col3:
-                            st.text_input(
-                                "Județ (din CNP)",
-                                value=f"{info.county_name} ({info.county_code})" if info.county_name else "",
-                                key="ang_add_cnp_county",
-                                disabled=True,
-                            )
+                    # Previzualizare constantă a datelor extrase din CNP în secțiunea „Date de bază”
+                    cnp_state = str(st.session_state.get("ang_add_cnp", "") or "").strip()
+                    st.markdown("#### Date extrase din CNP")
+                    if not cnp_state:
+                        st.caption("Completează CNP-ul pentru a vedea aici data nașterii, sexul și județul extrase automat.")
                     else:
-                        st.error(info.error or "CNP invalid – nu pot extrage datele.")
+                        info = decode_cnp(cnp_state, strict_county=False, allow_s_9=False)
+                        if info.valid:
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.text_input(
+                                    "Data nașterii (din CNP)",
+                                    value=info.birth_date.strftime("%d.%m.%Y") if info.birth_date else "",
+                                    key="ang_add_cnp_birth",
+                                    disabled=True,
+                                )
+                            with col2:
+                                st.text_input(
+                                    "Sex (din CNP)",
+                                    value=("Masculin" if info.sex == "M" else "Feminin") if info.sex else "",
+                                    key="ang_add_cnp_sex",
+                                    disabled=True,
+                                )
+                            with col3:
+                                st.text_input(
+                                    "Județ (din CNP)",
+                                    value=f"{info.county_name} ({info.county_code})" if info.county_name else "",
+                                    key="ang_add_cnp_county",
+                                    disabled=True,
+                                )
+                        else:
+                            st.error(info.error or "CNP invalid – nu pot extrage datele.")
 
-                ok = st.form_submit_button("💾 Salvează", key="ang_add_save_btn")
-                cancel = st.form_submit_button("↩ Renunță", key="ang_add_cancel_btn")
+                    ok = st.form_submit_button("💾 Salvează", key="ang_add_save_btn")
+                    cancel = st.form_submit_button("↩ Renunță", key="ang_add_cancel_btn")
 
             if cancel:
                 st.session_state["ang_selected_id"] = None
@@ -9658,6 +9736,21 @@ def page_angajati(conn: sqlite3.Connection):
                     if not ok_cnp:
                         st.error(f"CNP invalid: {msg_cnp}")
                     else:
+                        # Conversie numerică pentru câmpurile rescrise ca text în Add.
+                        try:
+                            _nr = str(values.get("nr_copii") or "").strip()
+                            if _nr != "":
+                                values["nr_copii"] = int(_nr)
+                        except Exception:
+                            st.error("Nr. copii trebuie să fie un număr întreg.")
+                            return
+                        try:
+                            _sal = str(values.get("salariu_baza") or "").strip()
+                            if _sal != "":
+                                values["salariu_baza"] = float(_sal.replace(",", "."))
+                        except Exception:
+                            st.error("Salariu de bază trebuie să fie numeric.")
+                            return
                         try:
                             new_id = _employee_upsert(conn, values, employee_id=None)
                         except ValueError as e:
@@ -9750,6 +9843,16 @@ def page_angajati(conn: sqlite3.Connection):
                         if (el) { el.scrollTop = 0; el.scrollIntoView && el.scrollIntoView({ behavior: 'instant', block: 'start' }); }
                     });
                     window.parent.scrollTo(0, 0);
+
+                    // Forțează deschiderea pe prima secțiune: main tab + subtab.
+                    var mainFirst = d.querySelector('.st-key-emp_main_tabs_box button[role="tab"]');
+                    if (mainFirst && mainFirst.getAttribute('aria-selected') !== 'true') {
+                        mainFirst.click();
+                    }
+                    var subFirst = d.querySelector('.st-key-emp_subtabs_box button[role="tab"]');
+                    if (subFirst && subFirst.getAttribute('aria-selected') !== 'true') {
+                        subFirst.click();
+                    }
                 }
                 run();
                 setTimeout(run, 100);
@@ -10615,6 +10718,7 @@ def page_angajati(conn: sqlite3.Connection):
 
                     st.markdown('<div class="s-title">📄 Raport</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Generează un raport PDF pentru dosar profesional / raportări.</div>', unsafe_allow_html=True)
+                    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
                     rt = st.selectbox(
                         "Alege tip raport",
@@ -11833,6 +11937,18 @@ def page_angajati(conn: sqlite3.Connection):
               font-size: 1.02rem;
               color: rgba(248,250,252,0.98);
             }
+            .ang-thin-guide-line{
+              width: min(50vw, 260px);
+              max-width: 100%;
+              height: 1px;
+              margin: 2px 0 10px 0;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.24) 55%,
+                rgba(148,163,184,0.02) 100%
+              );
+            }
             .ang-selected-rows{
               margin-top: 12px !important;
               display: flex;
@@ -11893,6 +12009,7 @@ def page_angajati(conn: sqlite3.Connection):
     def _render_angajat_selectat_box(emp: dict | None) -> None:
         st.markdown("<div class='ang-bottom-box'>", unsafe_allow_html=True)
         st.markdown("<p class='ang-bottom-title'>Angajat selectat</p>", unsafe_allow_html=True)
+        st.markdown("<div class='ang-thin-guide-line'></div>", unsafe_allow_html=True)
         if emp:
             full_name = f"{emp.get('last_name', '')} {emp.get('first_name', '')}".strip() or "—"
             emp_id_text = emp.get("id", "—")
