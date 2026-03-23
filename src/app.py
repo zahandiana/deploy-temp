@@ -6577,6 +6577,11 @@ def _employee_soft_delete(conn: sqlite3.Connection, employee_id: int) -> None:
     cur = conn.cursor()
     cur.execute("UPDATE employees SET activ = 0 WHERE id = ?", (int(employee_id),))
     conn.commit()
+    # Actualizare imediată în UI (fără întârziere din cache).
+    try:
+        load_employee_bundle.clear()
+    except Exception:
+        pass
 
 
 def normalize_employee_payload(conn: sqlite3.Connection, data: dict) -> dict:
@@ -6633,6 +6638,11 @@ def _employee_upsert(conn: sqlite3.Connection, data: dict, employee_id: int | No
         else:
             cur.execute("INSERT INTO employees DEFAULT VALUES")
         conn.commit()
+        # Actualizare imediată în UI (fără întârziere din cache).
+        try:
+            load_employee_bundle.clear()
+        except Exception:
+            pass
         return int(cur.lastrowid)
     else:
         keys = list(data.keys())
@@ -6641,6 +6651,11 @@ def _employee_upsert(conn: sqlite3.Connection, data: dict, employee_id: int | No
             vals = [data[k] for k in keys] + [int(employee_id)]
             cur.execute(f"UPDATE employees SET {set_sql} WHERE id = ?", vals)
             conn.commit()
+            # Actualizare imediată în UI (fără întârziere din cache).
+            try:
+                load_employee_bundle.clear()
+            except Exception:
+                pass
         return int(employee_id)
 
 
@@ -6744,6 +6759,44 @@ def _employee_field_labels() -> dict[str, str]:
     }
 
 
+def _render_info_section(title: str, rows: list[tuple[str, str]]) -> None:
+    """Randare uniformă label/value pentru secțiuni informative din fișa angajatului."""
+    def _esc(text: str) -> str:
+        return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    html_rows: list[str] = []
+    for label, value in rows:
+        raw_val = "" if value is None else str(value)
+        shown_val = raw_val.strip() if raw_val is not None else ""
+        is_empty = shown_val in ("", "—")
+        safe_val = "—" if is_empty else shown_val
+        row_html = (
+            "<div class='emp-info-row'>"
+            f"<div class='emp-info-label'>{_esc(label)}</div>"
+            f"<div class='emp-info-value{' is-empty' if is_empty else ''}'>{_esc(safe_val)}</div>"
+            "</div>"
+        )
+        html_rows.append(row_html)
+
+    st.markdown(
+        (
+            "<div class='emp-info-section'>"
+            f"<div class='emp-info-title'>{_esc(title)}</div>"
+            "<div class='emp-info-grid'>"
+            + "".join(html_rows)
+            + "</div></div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def _emp_v(emp: dict, key: str, default: str = "—") -> str:
+    """Returnează valoarea din employee ca text sigur pentru UI."""
+    raw = emp.get(key, "")
+    text = "" if raw is None else str(raw).strip()
+    return text if text else default
+
+
 def _render_cnp_field(label: str, value: str | None, *, key: str) -> str:
     """
     Secțiune dedicată pentru CNP în formularul de angajat.
@@ -6776,31 +6829,28 @@ def _render_cnp_field(label: str, value: str | None, *, key: str) -> str:
         if info.county_name:
             detalii.append(f"Județ: {info.county_name} ({info.county_code})")
         if detalii:
-            st.caption(" | ".join(detalii))
+            for d in detalii:
+                st.caption(d)
 
         # Casete vizibile cu datele extrase din CNP (în secțiunea „Date de bază”)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.text_input(
-                "Data nașterii (din CNP)",
-                value=info.birth_date.strftime("%d.%m.%Y") if info.birth_date else "",
-                key=f"{key}_dob_from_cnp",
-                disabled=True,
-            )
-        with col2:
-            st.text_input(
-                "Sex (din CNP)",
-                value=("Masculin" if info.sex == "M" else "Feminin") if info.sex else "",
-                key=f"{key}_sex_from_cnp",
-                disabled=True,
-            )
-        with col3:
-            st.text_input(
-                "Județ (din CNP)",
-                value=f"{info.county_name} ({info.county_code})" if info.county_name else "",
-                key=f"{key}_county_from_cnp",
-                disabled=True,
-            )
+        st.text_input(
+            "Data nașterii (din CNP)",
+            value=info.birth_date.strftime("%d.%m.%Y") if info.birth_date else "",
+            key=f"{key}_dob_from_cnp",
+            disabled=True,
+        )
+        st.text_input(
+            "Sex (din CNP)",
+            value=("Masculin" if info.sex == "M" else "Feminin") if info.sex else "",
+            key=f"{key}_sex_from_cnp",
+            disabled=True,
+        )
+        st.text_input(
+            "Județ (din CNP)",
+            value=f"{info.county_name} ({info.county_code})" if info.county_name else "",
+            key=f"{key}_county_from_cnp",
+            disabled=True,
+        )
     else:
         st.error(info.error or "CNP invalid.")
         extra = []
@@ -6817,7 +6867,15 @@ def _render_cnp_field(label: str, value: str | None, *, key: str) -> str:
     return raw
 
 
-def _render_employee_form_fields(employee: dict, cols: list[str], *, prefix: str) -> dict:
+def _render_employee_form_fields(
+    employee: dict,
+    cols: list[str],
+    *,
+    prefix: str,
+    single_column: bool = False,
+    fine_section_titles: bool = False,
+    parallel_groups: bool = False,
+) -> dict:
     """Randare câmpuri + colectare valori (dinamic, după schema DB)."""
     out = {}
     groups = _employee_field_groups(cols)
@@ -6833,46 +6891,81 @@ def _render_employee_form_fields(employee: dict, cols: list[str], *, prefix: str
         return col in ("activ",)
 
     labels = _employee_field_labels()
-    for gname, gcols in groups:
-        st.markdown(f"### {gname}")
-        # layout: 2 coloane
-        colL, colR = st.columns(2)
-        toggle = 0
-        for c in gcols:
-            val = employee.get(c, None)
-            # Etichetă: întâi din map-ul dedicat, altfel formatăm automat snake_case -> "Titlu Frumos"
-            if c in labels:
-                label = labels[c]
+    def _render_group(gname: str, gcols: list[str]) -> None:
+        with st.container():
+            if fine_section_titles:
+                st.markdown(f'<div class="emp-block-title">{gname}</div>', unsafe_allow_html=True)
             else:
-                parts = [p for p in str(c).split("_") if p]
-                label = " ".join(p.capitalize() for p in parts) if parts else str(c)
-            key = f"{prefix}_{c}"
+                st.markdown(f"### {gname}")
 
-            target = colL if toggle % 2 == 0 else colR
-            toggle += 1
-
-            with target:
-                if is_boolish(c):
-                    out[c] = st.checkbox(label, value=bool(val) if val is not None else True, key=key)
-                elif is_number(c):
-                    try:
-                        v0 = int(val) if val not in (None, "") else 0
-                    except Exception:
-                        v0 = 0
-                    out[c] = st.number_input(label, min_value=0, step=1, value=v0, key=key)
-                elif is_real(c):
-                    try:
-                        v0 = float(val) if val not in (None, "") else 0.0
-                    except Exception:
-                        v0 = 0.0
-                    out[c] = st.number_input(label, value=v0, key=key)
-                elif c == "cnp":
-                    # CNP are o secțiune specială, cu reguli explicate și validare vizibilă
-                    out[c] = _render_cnp_field(label, val, key=key)
+            # layout: 2 coloane sau 1 coloană (pentru editare aliniată stânga)
+            if single_column:
+                colL, colR = st.columns([1, 0.0001])
+            else:
+                colL, colR = st.columns(2)
+            toggle = 0
+            for c in gcols:
+                val = employee.get(c, None)
+                # Etichetă: întâi din map-ul dedicat, altfel formatăm automat snake_case -> "Titlu Frumos"
+                if c in labels:
+                    label = labels[c]
                 else:
-                    out[c] = st.text_input(label, value="" if val is None else str(val), key=key)
+                    parts = [p for p in str(c).split("_") if p]
+                    label = " ".join(p.capitalize() for p in parts) if parts else str(c)
+                key = f"{prefix}_{c}"
 
-        st.divider()
+                if single_column:
+                    target = colL
+                else:
+                    target = colL if toggle % 2 == 0 else colR
+                    toggle += 1
+
+                with target:
+                    if is_boolish(c):
+                        if single_column and prefix.startswith("ang_edit_"):
+                            st.markdown(f"**{label}**")
+                            out[c] = st.checkbox(
+                                "",
+                                value=bool(val) if val is not None else True,
+                                key=key,
+                                label_visibility="collapsed",
+                            )
+                        else:
+                            out[c] = st.checkbox(label, value=bool(val) if val is not None else True, key=key)
+                    elif is_number(c):
+                        try:
+                            v0 = int(val) if val not in (None, "") else 0
+                        except Exception:
+                            v0 = 0
+                        out[c] = st.number_input(label, min_value=0, step=1, value=v0, key=key)
+                    elif is_real(c):
+                        try:
+                            v0 = float(val) if val not in (None, "") else 0.0
+                        except Exception:
+                            v0 = 0.0
+                        out[c] = st.number_input(label, value=v0, key=key)
+                    elif c == "cnp":
+                        # CNP are o secțiune specială, cu reguli explicate și validare vizibilă
+                        out[c] = _render_cnp_field(label, val, key=key)
+                    else:
+                        out[c] = st.text_input(label, value="" if val is None else str(val), key=key)
+
+            st.divider()
+
+    if parallel_groups:
+        # Randăm în perechi pe rânduri separate: stânga + dreapta aliniate pe același nivel.
+        for i in range(0, len(groups), 2):
+            col_left, _, col_right = st.columns([1, 0.14, 1])
+            gname_l, gcols_l = groups[i]
+            with col_left:
+                _render_group(gname_l, gcols_l)
+            if i + 1 < len(groups):
+                gname_r, gcols_r = groups[i + 1]
+                with col_right:
+                    _render_group(gname_r, gcols_r)
+    else:
+        for gname, gcols in groups:
+            _render_group(gname, gcols)
 
     return out
 
@@ -7422,9 +7515,11 @@ def _render_employee_docs_manager(
     key_prefix: str,
     allow_edit: bool = True,
     bundle: dict | None = None,
+    stacked: bool = False,
 ) -> None:
     """UI generic pentru gestionarea documentelor (upload/list/download/activ/delete). Dacă bundle e dat, folosește bundle['employee_documents']."""
     st.markdown(f"#### {label}")
+    st.markdown("<div class='emp-thin-guide-line'></div>", unsafe_allow_html=True)
 
     actor = None
     try:
@@ -7433,13 +7528,18 @@ def _render_employee_docs_manager(
         actor = None
 
     if allow_edit:
-        c1, c2, c3 = st.columns([1.4, 1.2, 2.4])
-        with c1:
+        if stacked:
             doc_no = st.text_input("Număr / ID document", value="", key=f"{key_prefix}docno_{doc_type}")
-        with c2:
             doc_date = st.text_input("Data (dd.mm.yyyy)", value="", key=f"{key_prefix}docdate_{doc_type}")
-        with c3:
             note = st.text_input("Observații (opțional)", value="", key=f"{key_prefix}note_{doc_type}")
+        else:
+            c1, c2, c3 = st.columns([1.4, 1.2, 2.4])
+            with c1:
+                doc_no = st.text_input("Număr / ID document", value="", key=f"{key_prefix}docno_{doc_type}")
+            with c2:
+                doc_date = st.text_input("Data (dd.mm.yyyy)", value="", key=f"{key_prefix}docdate_{doc_type}")
+            with c3:
+                note = st.text_input("Observații (opțional)", value="", key=f"{key_prefix}note_{doc_type}")
 
         up = st.file_uploader(
             "Încarcă document (PDF / DOCX / JPG / PNG)",
@@ -7519,8 +7619,7 @@ def _render_employee_docs_manager(
     )
 
     fn, blob = _get_employee_document_bytes(conn, doc_id=int(sel))
-    b1, b2, b3 = st.columns([1.2, 1.2, 1.2])
-    with b1:
+    if stacked:
         if blob is not None:
             st.download_button(
                 "⬇️ Descarcă",
@@ -7531,8 +7630,6 @@ def _render_employee_docs_manager(
             )
         else:
             st.button("⬇️ Descarcă", disabled=True, key=f"{key_prefix}dl_dis_{doc_type}")
-
-    with b2:
         if allow_edit:
             if st.button("⭐ Setează activ", key=f"{key_prefix}setact_{doc_type}"):
                 try:
@@ -7552,8 +7649,6 @@ def _render_employee_docs_manager(
                     st.error(f"Eroare: {e}")
         else:
             st.button("⭐ Setează activ", disabled=True, key=f"{key_prefix}setact_dis_{doc_type}")
-
-    with b3:
         if allow_edit:
             if st.button("🗑 Șterge", key=f"{key_prefix}del_{doc_type}"):
                 try:
@@ -7573,6 +7668,61 @@ def _render_employee_docs_manager(
                     st.error(f"Eroare: {e}")
         else:
             st.button("🗑 Șterge", disabled=True, key=f"{key_prefix}del_dis_{doc_type}")
+    else:
+        b1, b2, b3 = st.columns([1.2, 1.2, 1.2])
+        with b1:
+            if blob is not None:
+                st.download_button(
+                    "⬇️ Descarcă",
+                    data=blob,
+                    file_name=fn or f"{doc_type}.bin",
+                    mime="application/octet-stream",
+                    key=f"{key_prefix}dl_{doc_type}",
+                )
+            else:
+                st.button("⬇️ Descarcă", disabled=True, key=f"{key_prefix}dl_dis_{doc_type}")
+
+        with b2:
+            if allow_edit:
+                if st.button("⭐ Setează activ", key=f"{key_prefix}setact_{doc_type}"):
+                    try:
+                        _employee_document_set_active(conn, doc_id=int(sel))
+                        _audit_log(
+                            conn,
+                            employee_id=int(emp_id),
+                            entity="employee_documents",
+                            entity_id=int(sel),
+                            action="set_active",
+                            details={"doc_type": doc_type, "doc_id": int(sel)},
+                            actor=actor,
+                        )
+                        st.success("Setat ca activ.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Eroare: {e}")
+            else:
+                st.button("⭐ Setează activ", disabled=True, key=f"{key_prefix}setact_dis_{doc_type}")
+
+        with b3:
+            if allow_edit:
+                if st.button("🗑 Șterge", key=f"{key_prefix}del_{doc_type}"):
+                    try:
+                        _employee_document_delete(conn, doc_id=int(sel))
+                        _audit_log(
+                            conn,
+                            employee_id=int(emp_id),
+                            entity="employee_documents",
+                            entity_id=int(sel),
+                            action="delete",
+                            details={"doc_type": doc_type, "doc_id": int(sel), "filename": fn},
+                            actor=actor,
+                        )
+                        st.success("Șters.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Eroare: {e}")
+            else:
+                st.button("🗑 Șterge", disabled=True, key=f"{key_prefix}del_dis_{doc_type}")
 
 
 
@@ -7759,8 +7909,7 @@ def _detasari_save_updates(conn: sqlite3.Connection, employee_id: int, edited_ro
 
 
 def render_detasari_editabile(conn: sqlite3.Connection, emp_id: int, emp: dict, *, allow_edit: bool = True, key_prefix: str = "", bundle: dict | None = None):
-    st.markdown("#### Detașări / delegări – tabel editabil (art. 45 Codul muncii)")
-    st.caption("Editezi direct în tabel. Bifezi «Activ» pentru detașarea curentă. Bifezi «Șterge» ca să elimini rândul.")
+    st.markdown("#### Detașări / delegări – registru editabil (art. 45 Codul muncii)")
 
     actor = None
     try:
@@ -7770,73 +7919,72 @@ def render_detasari_editabile(conn: sqlite3.Connection, emp_id: int, emp: dict, 
 
     # ---- Adaugă detașare (fără șablon) -> generăm DOCX minim și îl salvăm la employee_documents (doc_type=DETASARE)
     if allow_edit:
-        with st.expander("➕ Adaugă detașare (generează DOCX automat)", expanded=False):
-            c1, c2, c3 = st.columns([2, 2, 3])
-            with c1:
-                nr = st.text_input("Nr. decizie", key=f"{key_prefix}det_add_nr_{emp_id}")
-                data_decizie = st.text_input("Data decizie (dd.mm.yyyy)", key=f"{key_prefix}det_add_datadec_{emp_id}")
-                data_actiune = st.text_input("Data acțiune (dd.mm.yyyy) (opțional)", key=f"{key_prefix}det_add_dataact_{emp_id}")
-            with c2:
-                data_inceput = st.text_input("Data început (dd.mm.yyyy)", key=f"{key_prefix}det_add_start_{emp_id}")
-                data_sfarsit = st.text_input("Data sfârșit (dd.mm.yyyy)", key=f"{key_prefix}det_add_end_{emp_id}")
-                salariu_baza = st.text_input("Salariu de bază (opțional)", key=f"{key_prefix}det_add_sal_{emp_id}")
-            with c3:
-                ang_prim = st.text_input("Angajator primitor", key=f"{key_prefix}det_add_prim_{emp_id}")
-                functie = st.text_input("Funcție (opțional)", key=f"{key_prefix}det_add_func_{emp_id}")
-                loc_munca = st.text_input("Loc de muncă (opțional)", key=f"{key_prefix}det_add_loc_{emp_id}")
+        st.markdown('<div class="emp-subsection-title">➕ Adaugă detașare (generează DOCX automat)</div>', unsafe_allow_html=True)
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='emp-thin-guide-line'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        nr = st.text_input("Nr. decizie", key=f"{key_prefix}det_add_nr_{emp_id}")
+        data_decizie = st.text_input("Data decizie (dd.mm.yyyy)", key=f"{key_prefix}det_add_datadec_{emp_id}")
+        data_actiune = st.text_input("Data acțiune (dd.mm.yyyy) (opțional)", key=f"{key_prefix}det_add_dataact_{emp_id}")
+        data_inceput = st.text_input("Data început (dd.mm.yyyy)", key=f"{key_prefix}det_add_start_{emp_id}")
+        data_sfarsit = st.text_input("Data sfârșit (dd.mm.yyyy)", key=f"{key_prefix}det_add_end_{emp_id}")
+        salariu_baza = st.text_input("Salariu de bază (opțional)", key=f"{key_prefix}det_add_sal_{emp_id}")
+        ang_prim = st.text_input("Angajator primitor", key=f"{key_prefix}det_add_prim_{emp_id}")
+        functie = st.text_input("Funcție (opțional)", key=f"{key_prefix}det_add_func_{emp_id}")
+        loc_munca = st.text_input("Loc de muncă (opțional)", key=f"{key_prefix}det_add_loc_{emp_id}")
 
-            temei_legal = st.text_input("Temei legal (opțional)", value="art. 45 Codul muncii", key=f"{key_prefix}det_add_temei_{emp_id}")
-            motiv = st.text_area("Motiv / interesul serviciului", key=f"{key_prefix}det_add_motiv_{emp_id}", height=90)
-            schimbare_fel = st.checkbox("Se modifică și felul muncii (necesită consimțământ scris)", key=f"{key_prefix}det_add_fel_{emp_id}")
+        temei_legal = st.text_input("Temei legal (opțional)", value="art. 45 Codul muncii", key=f"{key_prefix}det_add_temei_{emp_id}")
+        motiv = st.text_area("Motiv / interesul serviciului", key=f"{key_prefix}det_add_motiv_{emp_id}", height=90)
+        schimbare_fel = st.checkbox("Se modifică și felul muncii (necesită consimțământ scris)", key=f"{key_prefix}det_add_fel_{emp_id}")
 
-            if st.button("💾 Salvează detașare (DOCX)", key=f"{key_prefix}det_add_save_{emp_id}"):
-                if not ang_prim.strip():
-                    st.warning("Completează «Angajator primitor».")
-                elif not data_inceput.strip():
-                    st.warning("Completează «Data început».")
-                else:
-                    salariat = f"{emp.get('nume','')} {emp.get('prenume','')}"
-                    payload = {
-                        "titlu": "DECIZIE DE DETAȘARE",
-                        "nr": nr,
-                        "data_decizie": data_decizie,
-                        "data_actiune": data_actiune,
-                        "data_inceput": data_inceput,
-                        "data_sfarsit": data_sfarsit,
-                        "angajator_expeditor": "",
-                        "angajator_primitor": ang_prim,
-                        "salariat": salariat.strip(),
-                        "cnp": emp.get("cnp",""),
-                        "functie": functie,
-                        "loc_munca": loc_munca,
-                        "motiv": motiv,
-                        "temei_legal": temei_legal,
-                        "schimbare_fel_munca": bool(schimbare_fel),
-                        "salariu_baza": salariu_baza,
-                    }
-                    docx_bytes = build_detasare_docx_bytes(payload)
-                    new_id = _save_employee_document(
-                        conn,
-                        employee_id=int(emp_id),
-                        doc_type="DETASARE",
-                        filename=f"Detasare_{nr or 'nou'}.docx",
-                        data=docx_bytes,
-                        doc_no=(nr or None),
-                        doc_date=(data_decizie or None),
-                        meta=payload,
-                        set_active=True,
-                    )
-                    _audit_log(
-                        conn,
-                        employee_id=int(emp_id),
-                        entity="employee_documents",
-                        entity_id=int(new_id),
-                        action="upload",
-                        details={"doc_type": "DETASARE", "nr": nr, "data_decizie": data_decizie, "angajator_primitor": ang_prim},
-                        actor=actor,
-                    )
-                    st.success("Detașare salvată.")
-                    st.rerun()
+        if st.button("💾 Salvează detașare (DOCX)", key=f"{key_prefix}det_add_save_{emp_id}"):
+            if not ang_prim.strip():
+                st.warning("Completează «Angajator primitor».")
+            elif not data_inceput.strip():
+                st.warning("Completează «Data început».")
+            else:
+                salariat = f"{emp.get('nume','')} {emp.get('prenume','')}"
+                payload = {
+                    "titlu": "DECIZIE DE DETAȘARE",
+                    "nr": nr,
+                    "data_decizie": data_decizie,
+                    "data_actiune": data_actiune,
+                    "data_inceput": data_inceput,
+                    "data_sfarsit": data_sfarsit,
+                    "angajator_expeditor": "",
+                    "angajator_primitor": ang_prim,
+                    "salariat": salariat.strip(),
+                    "cnp": emp.get("cnp",""),
+                    "functie": functie,
+                    "loc_munca": loc_munca,
+                    "motiv": motiv,
+                    "temei_legal": temei_legal,
+                    "schimbare_fel_munca": bool(schimbare_fel),
+                    "salariu_baza": salariu_baza,
+                }
+                docx_bytes = build_detasare_docx_bytes(payload)
+                new_id = _save_employee_document(
+                    conn,
+                    employee_id=int(emp_id),
+                    doc_type="DETASARE",
+                    filename=f"Detasare_{nr or 'nou'}.docx",
+                    data=docx_bytes,
+                    doc_no=(nr or None),
+                    doc_date=(data_decizie or None),
+                    meta=payload,
+                    set_active=True,
+                )
+                _audit_log(
+                    conn,
+                    employee_id=int(emp_id),
+                    entity="employee_documents",
+                    entity_id=int(new_id),
+                    action="upload",
+                    details={"doc_type": "DETASARE", "nr": nr, "data_decizie": data_decizie, "angajator_primitor": ang_prim},
+                    actor=actor,
+                )
+                st.success("Detașare salvată.")
+                st.rerun()
 
     st.divider()
 
@@ -7884,12 +8032,10 @@ def render_detasari_editabile(conn: sqlite3.Connection, emp_id: int, emp: dict, 
             key=f"{key_prefix}det_grid_{emp_id}",
         )
 
-        b1, b2 = st.columns([1.2, 8.8])
-        with b1:
-            if st.button("💾 Salvează modificările", key=f"{key_prefix}det_save_{emp_id}"):
-                _detasari_save_updates(conn, employee_id=int(emp_id), edited_rows=edited.to_dict(orient="records"), actor=actor)
-                st.success("Actualizat.")
-                st.rerun()
+        if st.button("💾 Salvează modificările", key=f"{key_prefix}det_save_{emp_id}"):
+            _detasari_save_updates(conn, employee_id=int(emp_id), edited_rows=edited.to_dict(orient="records"), actor=actor)
+            st.success("Actualizat.")
+            st.rerun()
 
     else:
         st.dataframe(df[cols_order], use_container_width=True, height=360)
@@ -7916,43 +8062,39 @@ def render_documente_informatii_salariat(conn: sqlite3.Connection, emp_id: int, 
     subt = st.tabs(["Decizii", "Detașări", "Pregătire profesională", "Alte documente", "Jurnal modificări"])
 
     with subt[0]:
+        with st.container(key=f"emp_decizii_stack_{emp_id}"):
+            # --- Generator decizie (DOCX) ---
+            st.markdown("### 🧾 Generează decizie (DOCX)")
+            st.caption("Completezi elementele necesare, iar aplicația generează documentul și îl salvează automat la «Decizii».")
 
-        # --- Generator decizie (DOCX) ---
-        st.markdown("### 🧾 Generează decizie (DOCX)")
-        st.caption("Completezi elementele necesare, iar aplicația generează documentul și îl salvează automat la «Decizii».")
+            preset = st.selectbox(
+                "Tip decizie (preset)",
+                [
+                    "Detașare (art.45)",
+                    "Încetare CIM - concediere individuală (art.65)",
+                    "Încetare CIM - acordul părților (art.55 lit.b)",
+                    "Încetare CIM - demisie (art.81)",
+                    "Suspendare de drept (art.51 lit.a)",
+                    "Întrerupere activitate (art.52 lit.c)",
+                    "Desfacere disciplinară (art.61 lit.a)",
+                    "Inapt fizic/psihic (art.61 lit.c)",
+                    "Pensionare (art.56 lit.c)",
+                    "Necorespundere profesională (art.61 lit.d)",
+                    "Reintegrare (art.56 lit.e)",
+                    "Mandat executare (art.56 lit.f)",
+                    "Altă decizie (generic)",
+                ],
+                key=f"dec_gen_preset_{emp_id}",
+            )
 
-        preset = st.selectbox(
-            "Tip decizie (preset)",
-            [
-                "Detașare (art.45)",
-                "Încetare CIM - concediere individuală (art.65)",
-                "Încetare CIM - acordul părților (art.55 lit.b)",
-                "Încetare CIM - demisie (art.81)",
-                "Suspendare de drept (art.51 lit.a)",
-                "Întrerupere activitate (art.52 lit.c)",
-                "Desfacere disciplinară (art.61 lit.a)",
-                "Inapt fizic/psihic (art.61 lit.c)",
-                "Pensionare (art.56 lit.c)",
-                "Necorespundere profesională (art.61 lit.d)",
-                "Reintegrare (art.56 lit.e)",
-                "Mandat executare (art.56 lit.f)",
-                "Altă decizie (generic)",
-            ],
-            key=f"dec_gen_preset_{emp_id}",
-        )
-
-        c1, c2, c3 = st.columns([2, 2, 3])
-        with c1:
             dec_nr = st.text_input("Nr. decizie", key=f"dec_gen_nr_{emp_id}")
             dec_data = st.text_input("Data (ex: 08.01.2026)", key=f"dec_gen_data_{emp_id}")
-        with c2:
             admin_name = st.text_input("Administrator / reprezentant", key=f"dec_gen_admin_{emp_id}")
             executor = st.text_input("Persoană responsabilă (opțional)", key=f"dec_gen_exec_{emp_id}")
-        with c3:
             tribunal = st.text_input("Instanță/Tribunal (opțional)", key=f"dec_gen_trib_{emp_id}")
 
-        # Date angajator (din Config dacă există; fallback: câmpuri editabile)
-        with st.expander("Date angajator (pentru antet)", expanded=False):
+            # Date angajator (din Config dacă există; fallback: câmpuri editabile)
+            st.markdown('<div class="emp-subsection-title">Date angajator (pentru antet)</div>', unsafe_allow_html=True)
             company_name = st.text_input(
                 "Denumire angajator",
                 value=str(st.session_state.get("CFG_ANGAJATOR_DEN", "") or ""),
@@ -7969,96 +8111,94 @@ def render_documente_informatii_salariat(conn: sqlite3.Connection, emp_id: int, 
                 key=f"dec_gen_creg_{emp_id}",
             )
 
-        # Salariat (din fișa curentă)
-        emp_name = f"{emp.get('nume','') or ''} {emp.get('prenume','') or ''}".strip()
-        emp_functie = str(emp.get("functie","") or emp.get("functia","") or emp.get("functie_cor","") or "").strip()
+            # Salariat (din fișa curentă)
+            emp_name = f"{emp.get('nume','') or ''} {emp.get('prenume','') or ''}".strip()
+            emp_functie = str(emp.get("functie","") or emp.get("functia","") or emp.get("functie_cor","") or "").strip()
 
-        st.markdown("### Conținut decizie")
-        titlu = st.text_input("Titlu document", value=preset.upper(), key=f"dec_gen_title_{emp_id}")
+            st.markdown("### Conținut decizie")
+            titlu = st.text_input("Titlu document", value=preset.upper(), key=f"dec_gen_title_{emp_id}")
 
-        preset_considerente = ""
-        preset_art1 = ""
-        preset_art2 = "Cu ducerea la îndeplinire a prezentei se însărcinează persoanele desemnate și se comunică celui în cauză."
+            preset_considerente = ""
+            preset_art1 = ""
+            preset_art2 = "Cu ducerea la îndeplinire a prezentei se însărcinează persoanele desemnate și se comunică celui în cauză."
 
-        if preset.startswith("Detașare"):
-            unitate = st.text_input("Unitate primitoare (SC ...)", key=f"dec_gen_unit_{emp_id}")
-            perioada = st.text_input("Perioadă (ex: 30 zile / 01.02.2026-01.03.2026)", key=f"dec_gen_per_{emp_id}")
-            data_start = st.text_input("Data începerii detașării", key=f"dec_gen_start_{emp_id}")
-            preset_considerente = "În baza prevederilor art.45 din Codul Muncii;\nÎn temeiul prevederilor Legii nr.31/1990 și a prerogativelor stabilite prin actul constitutiv al societății,"
-            preset_art1 = f"Începând cu data de {data_start} salariatul/ salariata {emp_name} având funcția de {emp_functie} se detașează la {unitate} pe o perioadă de {perioada}."
-        elif "concediere individuală" in preset:
-            motiv = st.text_area("Motive (pe scurt)", key=f"dec_gen_motiv_{emp_id}", height=80)
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_inc_{emp_id}")
-            preset_considerente = f"În baza prevederilor art.65(1) din Codul Muncii;\nAvând în vedere desființarea locului de muncă ocupat de {emp_name} ca urmare a: {motiv}"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.65(1) din Codul Muncii."
-        elif "acordul părților" in preset:
-            cerere = st.text_input("Nr./data cerere (opțional)", key=f"dec_gen_cer_{emp_id}")
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_inc2_{emp_id}")
-            preset_considerente = f"Având în vedere cererea {cerere} prin care {emp_name} solicită încetarea CIM prin acordul părților;\nÎn baza art.55 lit.b din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.55 lit.b din Codul Muncii."
-        elif "demisie" in preset:
-            nr_dem = st.text_input("Nr./data demisie (opțional)", key=f"dec_gen_dem_{emp_id}")
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_inc3_{emp_id}")
-            preset_considerente = f"Având în vedere demisia {nr_dem} prin care {emp_name} denunță unilateral CIM;\nÎn baza art.81 din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.81 din Codul Muncii."
-        elif "Suspendare de drept" in preset:
-            data_susp = st.text_input("Data începerii suspendării", key=f"dec_gen_susp_{emp_id}")
-            motiv = st.text_area("Motiv (ex: concediu creștere copil etc.)", key=f"dec_gen_suspm_{emp_id}", height=80)
-            preset_considerente = "În baza prevederilor art.51 lit.a din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_susp} se suspendă contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.51 lit.a din Codul Muncii, pentru: {motiv}."
-        elif "Întrerupere activitate" in preset:
-            data_susp = st.text_input("Data începerii suspendării", key=f"dec_gen_intr_{emp_id}")
-            motiv = st.text_area("Motive întrerupere activitate", key=f"dec_gen_intrm_{emp_id}", height=80)
-            proc = st.text_input("Indemnizație % (opțional)", key=f"dec_gen_intrp_{emp_id}")
-            suma = st.text_input("Suma indemnizație (opțional)", key=f"dec_gen_intrs_{emp_id}")
-            preset_considerente = "În baza prevederilor art.52 lit.c și art.53 din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_susp} se suspendă contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.52 lit.c din Codul Muncii, ca urmare a: {motiv}."
-            if proc or suma:
-                preset_art2 = f"Salariatul/ salariata beneficiază de indemnizație de {proc}% în sumă de {suma} lei (după caz).\n" + preset_art2
-        elif "Desfacere disciplinară" in preset:
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_disc_{emp_id}")
-            fapta = st.text_area("Abaterea disciplinară (descriere)", key=f"dec_gen_fapta_{emp_id}", height=90)
-            preset_considerente = "În baza art.61 lit.a, art.251-252 din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} se desface disciplinar contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.a din Codul Muncii, pentru: {fapta}."
-        elif "Inapt fizic/psihic" in preset:
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_inapt_{emp_id}")
-            det = st.text_area("Detalii (decizie medicală etc.)", key=f"dec_gen_inaptd_{emp_id}", height=90)
-            preset_considerente = "În baza art.61 lit.c, art.64 și art.76 din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.c din Codul Muncii. {det}"
-        elif "Pensionare" in preset:
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_pens_{emp_id}")
-            det = st.text_input("Nr./data decizie pensionare (opțional)", key=f"dec_gen_pensd_{emp_id}")
-            preset_considerente = "În baza prevederilor art.56 lit.c din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.56 lit.c din Codul Muncii. {det}"
-        elif "Necorespundere profesională" in preset:
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_nec_{emp_id}")
-            det = st.text_area("Detalii constatări/evaluare", key=f"dec_gen_necd_{emp_id}", height=90)
-            preset_considerente = "În baza art.61 lit.d, art.64 și art.76 din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.d din Codul Muncii. {det}"
-        elif "Reintegrare" in preset:
-            data_inc = st.text_input("Data efect reintegrare", key=f"dec_gen_reint_{emp_id}")
-            det = st.text_area("Detalii hotărâre judecătorească", key=f"dec_gen_reintd_{emp_id}", height=90)
-            preset_considerente = "În baza prevederilor art.56 lit.e din Codul Muncii;"
-            preset_art1 = f"Începând cu data de {data_inc} se dispune reintegrarea salariatului/salariatei, conform hotărârii judecătorești. {det}"
-        elif "Mandat executare" in preset:
-            data_inc = st.text_input("Data încetării", key=f"dec_gen_mand_{emp_id}")
-            det = st.text_input("Nr./data mandat (opțional)", key=f"dec_gen_mandd_{emp_id}")
-            preset_considerente = "În baza art.56 lit.f din Codul Muncii și a prevederilor Codului de procedură penală;"
-            preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.56 lit.f din Codul Muncii. {det}"
+            if preset.startswith("Detașare"):
+                unitate = st.text_input("Unitate primitoare (SC ...)", key=f"dec_gen_unit_{emp_id}")
+                perioada = st.text_input("Perioadă (ex: 30 zile / 01.02.2026-01.03.2026)", key=f"dec_gen_per_{emp_id}")
+                data_start = st.text_input("Data începerii detașării", key=f"dec_gen_start_{emp_id}")
+                preset_considerente = "În baza prevederilor art.45 din Codul Muncii;\nÎn temeiul prevederilor Legii nr.31/1990 și a prerogativelor stabilite prin actul constitutiv al societății,"
+                preset_art1 = f"Începând cu data de {data_start} salariatul/ salariata {emp_name} având funcția de {emp_functie} se detașează la {unitate} pe o perioadă de {perioada}."
+            elif "concediere individuală" in preset:
+                motiv = st.text_area("Motive (pe scurt)", key=f"dec_gen_motiv_{emp_id}", height=80)
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_inc_{emp_id}")
+                preset_considerente = f"În baza prevederilor art.65(1) din Codul Muncii;\nAvând în vedere desființarea locului de muncă ocupat de {emp_name} ca urmare a: {motiv}"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.65(1) din Codul Muncii."
+            elif "acordul părților" in preset:
+                cerere = st.text_input("Nr./data cerere (opțional)", key=f"dec_gen_cer_{emp_id}")
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_inc2_{emp_id}")
+                preset_considerente = f"Având în vedere cererea {cerere} prin care {emp_name} solicită încetarea CIM prin acordul părților;\nÎn baza art.55 lit.b din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.55 lit.b din Codul Muncii."
+            elif "demisie" in preset:
+                nr_dem = st.text_input("Nr./data demisie (opțional)", key=f"dec_gen_dem_{emp_id}")
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_inc3_{emp_id}")
+                preset_considerente = f"Având în vedere demisia {nr_dem} prin care {emp_name} denunță unilateral CIM;\nÎn baza art.81 din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.81 din Codul Muncii."
+            elif "Suspendare de drept" in preset:
+                data_susp = st.text_input("Data începerii suspendării", key=f"dec_gen_susp_{emp_id}")
+                motiv = st.text_area("Motiv (ex: concediu creștere copil etc.)", key=f"dec_gen_suspm_{emp_id}", height=80)
+                preset_considerente = "În baza prevederilor art.51 lit.a din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_susp} se suspendă contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.51 lit.a din Codul Muncii, pentru: {motiv}."
+            elif "Întrerupere activitate" in preset:
+                data_susp = st.text_input("Data începerii suspendării", key=f"dec_gen_intr_{emp_id}")
+                motiv = st.text_area("Motive întrerupere activitate", key=f"dec_gen_intrm_{emp_id}", height=80)
+                proc = st.text_input("Indemnizație % (opțional)", key=f"dec_gen_intrp_{emp_id}")
+                suma = st.text_input("Suma indemnizație (opțional)", key=f"dec_gen_intrs_{emp_id}")
+                preset_considerente = "În baza prevederilor art.52 lit.c și art.53 din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_susp} se suspendă contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.52 lit.c din Codul Muncii, ca urmare a: {motiv}."
+                if proc or suma:
+                    preset_art2 = f"Salariatul/ salariata beneficiază de indemnizație de {proc}% în sumă de {suma} lei (după caz).\n" + preset_art2
+            elif "Desfacere disciplinară" in preset:
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_disc_{emp_id}")
+                fapta = st.text_area("Abaterea disciplinară (descriere)", key=f"dec_gen_fapta_{emp_id}", height=90)
+                preset_considerente = "În baza art.61 lit.a, art.251-252 din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} se desface disciplinar contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.a din Codul Muncii, pentru: {fapta}."
+            elif "Inapt fizic/psihic" in preset:
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_inapt_{emp_id}")
+                det = st.text_area("Detalii (decizie medicală etc.)", key=f"dec_gen_inaptd_{emp_id}", height=90)
+                preset_considerente = "În baza art.61 lit.c, art.64 și art.76 din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.c din Codul Muncii. {det}"
+            elif "Pensionare" in preset:
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_pens_{emp_id}")
+                det = st.text_input("Nr./data decizie pensionare (opțional)", key=f"dec_gen_pensd_{emp_id}")
+                preset_considerente = "În baza prevederilor art.56 lit.c din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.56 lit.c din Codul Muncii. {det}"
+            elif "Necorespundere profesională" in preset:
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_nec_{emp_id}")
+                det = st.text_area("Detalii constatări/evaluare", key=f"dec_gen_necd_{emp_id}", height=90)
+                preset_considerente = "În baza art.61 lit.d, art.64 și art.76 din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.61 lit.d din Codul Muncii. {det}"
+            elif "Reintegrare" in preset:
+                data_inc = st.text_input("Data efect reintegrare", key=f"dec_gen_reint_{emp_id}")
+                det = st.text_area("Detalii hotărâre judecătorească", key=f"dec_gen_reintd_{emp_id}", height=90)
+                preset_considerente = "În baza prevederilor art.56 lit.e din Codul Muncii;"
+                preset_art1 = f"Începând cu data de {data_inc} se dispune reintegrarea salariatului/salariatei, conform hotărârii judecătorești. {det}"
+            elif "Mandat executare" in preset:
+                data_inc = st.text_input("Data încetării", key=f"dec_gen_mand_{emp_id}")
+                det = st.text_input("Nr./data mandat (opțional)", key=f"dec_gen_mandd_{emp_id}")
+                preset_considerente = "În baza art.56 lit.f din Codul Muncii și a prevederilor Codului de procedură penală;"
+                preset_art1 = f"Începând cu data de {data_inc} încetează contractul individual de muncă al salariatului/salariatei {emp_name}, având funcția de {emp_functie}, conform art.56 lit.f din Codul Muncii. {det}"
 
-        considerente = st.text_area(
-            "Considerente (poți edita)",
-            value=preset_considerente,
-            key=f"dec_gen_cons_{emp_id}",
-            height=120,
-        )
+            considerente = st.text_area(
+                "Considerente (poți edita)",
+                value=preset_considerente,
+                key=f"dec_gen_cons_{emp_id}",
+                height=120,
+            )
 
-        a1 = st.text_area("Art.1 (poți edita)", value=preset_art1, key=f"dec_gen_a1_{emp_id}", height=90)
-        a2 = st.text_area("Art.2 (poți edita)", value=preset_art2, key=f"dec_gen_a2_{emp_id}", height=80)
-        a3 = st.text_area("Art.3 (opțional)", value="", key=f"dec_gen_a3_{emp_id}", height=70)
+            a1 = st.text_area("Art.1 (poți edita)", value=preset_art1, key=f"dec_gen_a1_{emp_id}", height=90)
+            a2 = st.text_area("Art.2 (poți edita)", value=preset_art2, key=f"dec_gen_a2_{emp_id}", height=80)
+            a3 = st.text_area("Art.3 (opțional)", value="", key=f"dec_gen_a3_{emp_id}", height=70)
 
-        gen1, gen2 = st.columns([2, 6])
-        with gen1:
             if st.button("🧾 Generează DOCX", key=f"dec_gen_btn_{emp_id}"):
                 payload = {
                     "COMPANY_NAME": company_name,
@@ -8117,6 +8257,7 @@ def render_documente_informatii_salariat(conn: sqlite3.Connection, emp_id: int, 
             key_prefix=f"ang_docs_{emp_id}_dec_",
             allow_edit=allow_edit_docs,
             bundle=bundle,
+            stacked=True,
         )
 
     with subt[1]:
@@ -8137,6 +8278,7 @@ def render_documente_informatii_salariat(conn: sqlite3.Connection, emp_id: int, 
             key_prefix=f"ang_docs_{emp_id}_preg_",
             allow_edit=allow_edit_docs,
             bundle=bundle,
+            stacked=True,
         )
 
     with subt[3]:
@@ -8148,10 +8290,12 @@ def render_documente_informatii_salariat(conn: sqlite3.Connection, emp_id: int, 
             key_prefix=f"ang_docs_{emp_id}_alte_",
             allow_edit=allow_edit_docs,
             bundle=bundle,
+            stacked=True,
         )
 
     with subt[4]:
         st.markdown("#### Jurnal (audit) – încărcări / ștergeri / activări")
+        st.markdown("<div class='emp-thin-guide-line'></div>", unsafe_allow_html=True)
         rows = _audit_list(conn, employee_id=int(emp_id), limit=300)
         if not rows:
             st.info("Nu există evenimente în jurnal încă.")
@@ -8374,26 +8518,959 @@ def page_angajati(conn: sqlite3.Connection):
           padding: 14px 18px;
           margin-bottom: 16px;
         }
+        .st-key-emp_header_center_box{
+          max-width: min(72vw, 760px) !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          padding-top: 6px !important;
+          padding-bottom: 6px !important;
+        }
+        section.main:has(#emp-scope) .emp-detail-header .emp-header-center{
+          text-align: center !important;
+        }
+        section.main:has(#emp-scope) .emp-detail-header .emp-header-name{
+          font-size: 1.56rem !important;
+          line-height: 1.2 !important;
+          font-weight: 900 !important;
+          color: rgba(248,250,252,0.98) !important;
+          letter-spacing: 0.01em;
+          margin: 0 !important;
+        }
+        section.main:has(#emp-scope) .emp-detail-header .emp-header-marca{
+          font-size: 1.06rem !important;
+          font-weight: 800 !important;
+          color: rgba(226,232,240,0.96) !important;
+          margin-top: 8px !important;
+        }
+        section.main:has(#emp-scope) .emp-detail-header .emp-header-state{
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          margin-top: 10px !important;
+          margin-bottom: 22px !important;
+          color: rgba(148,163,184,0.96) !important;
+        }
+        .st-key-emp_header_actions [data-testid="stVerticalBlock"]{
+          align-items: center !important;
+        }
+        .st-key-emp_header_actions [data-testid="stButton"]{
+          width: 100% !important;
+          margin-top: 8px !important;
+        }
+        .st-key-emp_header_actions [data-testid="stButton"]:first-of-type{
+          margin-top: 8px !important;
+        }
+        .st-key-emp_header_actions [data-testid="stButton"] > button{
+          width: 260px !important;
+          min-width: 260px !important;
+          max-width: 260px !important;
+          min-height: 38px !important;
+          height: 38px !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
         section.main:has(#emp-scope) .emp-detail-header .stSubheader,
         section.main:has(#emp-scope) .emp-detail-header [data-testid="stMarkdown"]{
           font-size: 1.25rem !important;
           font-weight: 800 !important;
           color: rgba(248,250,252,0.98) !important;
         }
-        /* Secțiuni principale: Date salariat | Documente – tab-uri evidente, colțuri moderate */
-        section.main:has(#emp-scope) div[data-testid="stTabs"]:first-of-type > div[role="tablist"]{
-          margin-bottom: 12px;
+        /* Tabs principale din fișa angajatului: Date salariat | Documente */
+        .st-key-emp_main_tabs_box div[data-testid="stTabs"] > div[role="tablist"]{
+          display: flex !important;
+          gap: 0 !important;
+          margin: 6px 0 14px 0 !important;
+          padding: 0 !important;
+          border-bottom: 1px solid rgba(148,163,184,0.28) !important;
         }
-        section.main:has(#emp-scope) div[data-testid="stTabs"]:first-of-type button[role="tab"]{
-          font-size: 1.05rem !important;
+        .st-key-emp_main_tabs_box div[data-testid="stTabs"] button[role="tab"]{
+          min-height: 38px !important;
+          height: 38px !important;
+          padding: 0 14px !important;
+          border: none !important;
+          border-radius: 0 !important;
+          border-bottom: 2px solid transparent !important;
+          background: transparent !important;
+          color: rgba(226,232,240,0.88) !important;
+          font-size: 0.94rem !important;
           font-weight: 700 !important;
-          padding: 12px 20px !important;
-          border-radius: 6px !important;
+          margin: 0 !important;
+          transition: color .18s ease, border-color .18s ease !important;
         }
-        section.main:has(#emp-scope) div[data-testid="stTabs"]:first-of-type button[role="tab"][aria-selected="true"]{
-          background: rgba(255,255,255,0.14) !important;
-          border-color: rgba(255,255,255,0.25) !important;
-          color: #fff !important;
+        .st-key-emp_main_tabs_box div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+          background: transparent !important;
+          color: #ffffff !important;
+          border-bottom-color: rgba(56,189,248,0.92) !important;
+          box-shadow: none !important;
+        }
+
+        /* Sub-tabs din Date salariat: pills compacte, rând dedicat, scroll orizontal fin */
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"]{
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          gap: 10px !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          margin: 12px 0 22px 0 !important;
+          padding: 2px 2px 10px 2px !important;
+          border-bottom: 1px solid rgba(148,163,184,0.20) !important;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(100,116,139,0.8) transparent;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"]::-webkit-scrollbar{
+          height: 8px;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"]::-webkit-scrollbar-thumb{
+          background: rgba(100,116,139,0.75);
+          border-radius: 999px;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"]::-webkit-scrollbar-track{
+          background: transparent;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] button[role="tab"]{
+          flex: 0 0 auto !important;
+          white-space: nowrap !important;
+          min-height: 36px !important;
+          height: 36px !important;
+          padding: 0 14px !important;
+          margin: 0 !important;
+          border-radius: 11px !important;
+          border: 1px solid rgba(148,163,184,0.35) !important;
+          background: rgba(15,23,42,0.50) !important;
+          color: rgba(226,232,240,0.88) !important;
+          font-size: 0.87rem !important;
+          font-weight: 650 !important;
+          letter-spacing: 0.01em;
+          transition: border-color .18s ease, background-color .18s ease, color .18s ease, box-shadow .18s ease !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] button[role="tab"]:hover{
+          border-color: rgba(148,163,184,0.58) !important;
+          background: rgba(30,41,59,0.64) !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        /* Mini-grup acțiuni: separare clară înainte de Edit/Șterge */
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(8){
+          margin-left: 52px !important;
+          border-color: rgba(148,163,184,0.52) !important;
+          background: rgba(30,41,59,0.58) !important;
+          color: rgba(248,250,252,0.96) !important;
+          font-weight: 700 !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(9){
+          border-color: rgba(248,113,113,0.44) !important;
+          background: rgba(127,29,29,0.24) !important;
+          color: rgba(254,226,226,0.98) !important;
+          font-weight: 700 !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(8):hover{
+          border-color: rgba(148,163,184,0.72) !important;
+          background: rgba(51,65,85,0.72) !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(9):hover{
+          border-color: rgba(248,113,113,0.66) !important;
+          background: rgba(127,29,29,0.30) !important;
+          color: #fee2e2 !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+          background: rgba(30,41,59,0.96) !important;
+          border-color: rgba(56,189,248,0.82) !important;
+          color: #ffffff !important;
+          box-shadow: 0 0 0 2px rgba(56,189,248,0.15) !important;
+          font-weight: 750 !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(8)[aria-selected="true"]{
+          border-color: rgba(148,163,184,0.84) !important;
+          box-shadow: 0 0 0 2px rgba(148,163,184,0.18) !important;
+        }
+        .st-key-emp_subtabs_box div[data-testid="stTabs"] > div[role="tablist"] > button[role="tab"]:nth-of-type(9)[aria-selected="true"]{
+          border-color: rgba(248,113,113,0.78) !important;
+          background: rgba(127,29,29,0.38) !important;
+          color: #fee2e2 !important;
+          box-shadow: 0 0 0 2px rgba(248,113,113,0.20) !important;
+        }
+        /* Fișa angajatului (Date personale): secțiuni label/value, uniforme */
+        .st-key-emp_subtabs_box .emp-info-section{
+          margin: 0 0 16px 0;
+          padding: 10px 0 0 0;
+        }
+        .st-key-emp_subtabs_box .emp-info-title{
+          font-size: 1.02rem !important;
+          font-weight: 760 !important;
+          color: rgba(248,250,252,0.97) !important;
+          margin: 0 0 10px 0;
+          padding-bottom: 6px;
+          border-bottom: none !important;
+          background-image: linear-gradient(90deg, rgba(148,163,184,0.36), rgba(148,163,184,0.08));
+          background-repeat: no-repeat;
+          background-size: min(50vw, 620px) 1px;
+          background-position: left bottom;
+          letter-spacing: 0.01em;
+        }
+        .st-key-emp_subtabs_box .emp-info-grid{
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+        .st-key-emp_subtabs_box .emp-info-row{
+          display: grid;
+          grid-template-columns: minmax(170px, 240px) minmax(260px, 1fr);
+          align-items: baseline;
+          column-gap: 14px;
+          row-gap: 4px;
+          padding: 2px 0;
+          border-bottom: none !important;
+          background-image: linear-gradient(90deg, rgba(148,163,184,0.30), rgba(148,163,184,0.06));
+          background-repeat: no-repeat;
+          background-size: min(50vw, 620px) 1px;
+          background-position: left bottom;
+        }
+        .st-key-emp_subtabs_box .emp-info-label{
+          color: rgba(148,163,184,0.92) !important;
+          font-size: 0.87rem !important;
+          font-weight: 620 !important;
+        }
+        .st-key-emp_subtabs_box .emp-info-value{
+          color: rgba(248,250,252,0.97) !important;
+          font-size: 0.92rem !important;
+          font-weight: 690 !important;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .st-key-emp_subtabs_box .emp-info-value.is-empty{
+          color: rgba(148,163,184,0.70) !important;
+          font-style: italic;
+          font-weight: 560 !important;
+        }
+        .st-key-emp_subtabs_box .emp-info-section + [data-testid="stMarkdown"] hr,
+        .st-key-emp_subtabs_box .emp-info-section + [data-testid="stHorizontalRule"]{
+          margin-top: 6px !important;
+          margin-bottom: 12px !important;
+          opacity: 0.35;
+        }
+        /* Coerență vizuală pentru restul subtab-urilor Angajați */
+        .st-key-emp_subtabs_box .emp-block-title{
+          display: block !important;
+          width: 100% !important;
+          font-size: 1.01rem !important;
+          font-weight: 740 !important;
+          color: rgba(248,250,252,0.96) !important;
+          margin: 12px 0 12px 0 !important;
+          padding-bottom: 6px;
+          border-bottom: none !important;
+          background-image: linear-gradient(90deg, rgba(148,163,184,0.36), rgba(148,163,184,0.08));
+          background-repeat: no-repeat;
+          background-size: min(50vw, 620px) 1px;
+          background-position: left bottom;
+          letter-spacing: 0.01em;
+        }
+        .st-key-emp_subtabs_box [data-testid="stDataFrame"]{
+          border: 1px solid rgba(148,163,184,0.18) !important;
+          border-radius: 8px !important;
+          overflow: hidden !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box .s-card{
+          background: rgba(15,23,42,0.88) !important;
+          border: 1px solid rgba(148,163,184,0.20) !important;
+          border-radius: 8px !important;
+          padding: 14px 16px !important;
+          margin-bottom: 14px !important;
+        }
+        .st-key-emp_subtabs_box .s-title{
+          font-size: 1rem !important;
+          font-weight: 730 !important;
+          margin: 0.2em 0 0.55em 0 !important;
+          border-bottom: none !important;
+          padding-bottom: 0.35em !important;
+          color: rgba(248,250,252,0.96) !important;
+          background-image: linear-gradient(90deg, rgba(148,163,184,0.36), rgba(148,163,184,0.08));
+          background-repeat: no-repeat;
+          background-size: min(50vw, 620px) 1px;
+          background-position: left bottom;
+        }
+        .st-key-emp_subtabs_box .s-muted{
+          color: rgba(148,163,184,0.90) !important;
+          font-size: 0.84rem !important;
+        }
+        .st-key-emp_subtabs_box .emp-vechime-note{
+          color: rgba(203,213,225,0.95) !important;
+          font-size: 0.90rem !important;
+          margin: 4px 0 8px 0 !important;
+          display: block !important;
+        }
+        .st-key-emp_subtabs_box .emp-vechime-status{
+          color: rgba(248,250,252,0.98) !important;
+          font-size: 0.93rem !important;
+          margin: 2px 0 12px 0 !important;
+          display: block !important;
+        }
+        .st-key-emp_subtabs_box .emp-overview-sep{
+          height: 1px;
+          width: min(50vw, 620px);
+          margin: 10px 0 10px 0;
+          background: linear-gradient(90deg, rgba(148,163,184,0.34), rgba(148,163,184,0.08));
+          border-radius: 999px;
+        }
+        .st-key-emp_subtabs_box .emp-overview-pills{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin: 4px 0 6px 0;
+        }
+        .st-key-emp_subtabs_box .emp-subsection-title{
+          font-size: 0.92rem !important;
+          font-weight: 700 !important;
+          color: rgba(226,232,240,0.96) !important;
+          margin: 10px 0 6px 0 !important;
+          letter-spacing: 0.01em;
+        }
+        .st-key-emp_subtabs_box .emp-section-title{
+          font-size: 1.02rem !important;
+          font-weight: 760 !important;
+          color: rgba(248,250,252,0.97) !important;
+          margin: 12px 0 8px 0 !important;
+          padding-bottom: 6px;
+          background-image: linear-gradient(90deg, rgba(148,163,184,0.36), rgba(148,163,184,0.08));
+          background-repeat: no-repeat;
+          background-size: min(50vw, 620px) 1px;
+          background-position: left bottom;
+          letter-spacing: 0.01em;
+        }
+        .st-key-emp_subtabs_box .emp-subsubsection-title{
+          font-size: 0.84rem !important;
+          font-weight: 680 !important;
+          color: rgba(203,213,225,0.95) !important;
+          margin: 8px 0 5px 0 !important;
+          letter-spacing: 0.01em;
+        }
+        .st-key-ang_edit_form [data-testid="stHorizontalBlock"]{
+          justify-content: flex-start !important;
+          align-items: flex-start !important;
+        }
+        .st-key-ang_edit_panel{
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-ang_edit_panel .stTextInput,
+        .st-key-ang_edit_panel .stNumberInput,
+        .st-key-ang_edit_panel .stTextArea,
+        .st-key-ang_edit_panel .stSelectbox,
+        .st-key-ang_edit_panel .stDateInput,
+        .st-key-ang_edit_panel .stCheckbox{
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-ang_edit_panel .stCheckbox [data-testid="stCheckbox"]{
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          flex-direction: row !important;
+        }
+        .st-key-ang_edit_panel [data-testid="stFormSubmitButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-ang_delete_panel{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-ang_delete_panel [data-testid="stCheckbox"]{
+          justify-content: flex-start !important;
+        }
+        .st-key-ang_delete_panel [data-testid="stButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .stTextInput,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .stTextArea,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .stSelectbox,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .stDateInput,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .stCheckbox{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] [data-testid="stButton"] > button,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] .stTextInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] .stTextArea,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] .stSelectbox,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] .stDateInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] .stFileUploader{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] [data-testid="stButton"] > button,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .stTextInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .stTextArea,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .stSelectbox,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .stDateInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .stCheckbox{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] [data-testid="stButton"] > button,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] .stTextInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] .stTextArea,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] .stSelectbox,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] .stDateInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] .stFileUploader{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] [data-testid="stButton"] > button,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_preg_"] [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] .stTextInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] .stTextArea,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] .stSelectbox,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] .stDateInput,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] .stFileUploader{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] [data-testid="stButton"] > button,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          display: block !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .emp-subsection-title{
+          font-size: 1.08rem !important;
+          font-weight: 800 !important;
+          line-height: 1.25 !important;
+          letter-spacing: 0.01em;
+          margin: 12px 0 8px 0 !important;
+          position: relative;
+          padding-bottom: 8px !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .emp-subsection-title::after{
+          content: "";
+          display: block;
+          width: min(50vw, 420px);
+          max-width: 100%;
+          height: 1px;
+          margin-top: 7px;
+          background: linear-gradient(
+            90deg,
+            rgba(148,163,184,0.46) 0%,
+            rgba(148,163,184,0.24) 55%,
+            rgba(148,163,184,0.02) 100%
+          );
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .emp-subsection-title,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] h3,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] h4{
+          position: relative;
+          margin-bottom: 12px !important;
+          padding-bottom: 8px !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] .emp-subsection-title::after,
+        .st-key-emp_main_tabs_box [class*="st-key-emp_decizii_stack_"] h3::after,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_dec_"] h4::after{
+          content: "";
+          display: block;
+          width: min(50vw, 420px);
+          max-width: 100%;
+          height: 1px;
+          margin-top: 7px;
+          background: linear-gradient(
+            90deg,
+            rgba(148,163,184,0.46) 0%,
+            rgba(148,163,184,0.24) 55%,
+            rgba(148,163,184,0.02) 100%
+          );
+        }
+        .st-key-emp_main_tabs_box .emp-thin-guide-line{
+          width: min(50vw, 420px);
+          max-width: 100%;
+          height: 1px;
+          margin: 4px 0 12px 0;
+          background: linear-gradient(
+            90deg,
+            rgba(148,163,184,0.46) 0%,
+            rgba(148,163,184,0.24) 55%,
+            rgba(148,163,184,0.02) 100%
+          );
+        }
+        /* Vechime: același pattern de aliniere/dimensiune ca în Detalii */
+        .st-key-emp_subtabs_box [class*="st-key-ant_work_form_"] [data-testid="stHorizontalBlock"],
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] [data-testid="stHorizontalBlock"]{
+          justify-content: flex-start !important;
+          align-items: flex-start !important;
+          gap: 12px !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_work_form_"] [data-testid="stHorizontalBlock"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] [data-testid="stHorizontalBlock"] > div{
+          flex: 0 1 auto !important;
+          min-width: 0 !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_work_form_"] .stNumberInput,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] .stNumberInput,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] .stTextInput,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] .stSelectbox{
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_work_form_"] [data-testid="stFormSubmitButton"] > button,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] [data-testid="stFormSubmitButton"] > button{
+          width: 220px !important;
+          min-width: 220px !important;
+          max-width: 220px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          border-radius: 10px !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          background: rgba(15,23,42,0.60) !important;
+          color: rgba(248,250,252,0.96) !important;
+          font-weight: 700 !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_work_form_"] [data-testid="stFormSubmitButton"] > button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_form_"] [data-testid="stFormSubmitButton"] > button:hover{
+          border-color: rgba(148,163,184,0.58) !important;
+          background: rgba(30,41,59,0.72) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] [data-testid="stHorizontalBlock"]{
+          justify-content: flex-start !important;
+          align-items: flex-start !important;
+          gap: 12px !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] [data-testid="stHorizontalBlock"] > div{
+          flex: 0 1 auto !important;
+          min-width: 0 !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stTextInput,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stTextArea,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stSelectbox,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stCheckbox{
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        /* Data nașterii (dep details): elimină complet haloul/albul wrapper-ului */
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput > div,
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput div[data-baseweb="input"],
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput div[data-baseweb="input"] > div{
+          background: transparent !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput div[data-baseweb="input"]{
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          border-radius: 10px !important;
+          overflow: hidden !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput input{
+          background: rgba(15,23,42,0.60) !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_details_box_"] .stDateInput button{
+          background: rgba(15,23,42,0.60) !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        /* Vechime - simplu: un singur border, fără dubluri/alb */
+        .st-key-emp_subtabs_box [class*="st-key-data_ang_date_"],
+        .st-key-emp_subtabs_box [class*="st-key-data_plec_date_"],
+        .st-key-emp_subtabs_box [class*="st-key-still_active_"],
+        .st-key-emp_subtabs_box [class*="st-key-auto_calc_inst_"],
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"],
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"],
+        .st-key-emp_subtabs_box [class*="st-key-vechime_report_type_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-data_ang_date_"] div[data-baseweb="input"],
+        .st-key-emp_subtabs_box [class*="st-key-data_plec_date_"] div[data-baseweb="input"],
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] div[data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-vechime_report_type_"] div[data-baseweb="select"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          border-radius: 10px !important;
+          box-shadow: none !important;
+          overflow: hidden !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-data_ang_date_"] div[data-baseweb="input"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-data_plec_date_"] div[data-baseweb="input"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] div[data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-vechime_report_type_"] div[data-baseweb="select"] > div{
+          border: none !important;
+          background: transparent !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-data_ang_date_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-data_plec_date_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] input{
+          background: transparent !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_edit_btn_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-ant_lock_btn_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-gen_report_btn_"] button{
+          width: 220px !important;
+          min-width: 220px !important;
+          max-width: 220px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-top: 8px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          border-radius: 10px !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          background: rgba(15,23,42,0.60) !important;
+          color: rgba(248,250,252,0.96) !important;
+          box-shadow: none !important;
+        }
+        /* Contract de muncă: casete ca în Angajați, până la jumătate pagină */
+        .st-key-emp_subtabs_box [class*="st-key-cim_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stTextInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stTextAreaRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] .stSelectbox div[data-baseweb="select"],
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] .stDateInput div[data-baseweb="input"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          border-radius: 10px !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stTextInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] [data-testid="stTextAreaRootElement"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] .stSelectbox div[data-baseweb="select"] > div,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"] .stDateInput div[data-baseweb="input"] > div{
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-aa_code_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-aa_code_gen_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-aa_code_gen_pdf_"] button{
+          width: 220px !important;
+          min-width: 220px !important;
+          max-width: 220px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_code_gen_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-cim_code_gen_pdf_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_save"] button,
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_set_active"] button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-reg_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-reg_save_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-reg_cancel_"] button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        /* COD COR: doar secțiunile de după tabel la 50% */
+        .st-key-emp_subtabs_box [class*="st-key-cor_sel_"],
+        .st-key-emp_subtabs_box [class*="st-key-cor_cod_in_"],
+        .st-key-emp_subtabs_box [class*="st-key-cor_den_in_"],
+        .st-key-emp_subtabs_box [class*="st-key-cor_save_tbl_"],
+        .st-key-emp_subtabs_box [class*="st-key-cor_apply_emp_"],
+        .st-key-emp_subtabs_box [class*="st-key-cor_del_tbl_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cor_save_tbl_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-cor_apply_emp_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-cor_del_tbl_"] button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-l153_save_tbl_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-l153_apply_emp_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-l153_del_tbl_"] button,
+        .st-key-emp_subtabs_box [class*="st-key-l153_grid_"][class*="save_active"] button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        /* Legea 153: secțiunile de după tabel la 50% */
+        .st-key-emp_subtabs_box [class*="st-key-l153_sel_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_cod_in_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_den_in_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_save_tbl_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_apply_emp_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_del_tbl_"],
+        .st-key-emp_subtabs_box [class*="st-key-l153_grid_"]{
+          max-width: 50% !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+        }
+        /* EMP subtabs: elimină complet alb-ul din casete */
+        .st-key-emp_subtabs_box [data-testid="stTextInputRootElement"],
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [data-testid="stTextAreaRootElement"],
+        .st-key-emp_subtabs_box .stSelectbox div[data-baseweb="select"],
+        .st-key-emp_subtabs_box .stDateInput div[data-baseweb="input"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          border-radius: 10px !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [data-testid="stTextInputRootElement"] > div,
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"] > div,
+        .st-key-emp_subtabs_box [data-testid="stTextAreaRootElement"] > div,
+        .st-key-emp_subtabs_box .stSelectbox div[data-baseweb="select"] > div,
+        .st-key-emp_subtabs_box .stDateInput div[data-baseweb="input"] > div{
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box input,
+        .st-key-emp_subtabs_box textarea{
+          background: transparent !important;
+          color: rgba(248,250,252,0.96) !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box .stDateInput button,
+        .st-key-emp_subtabs_box .stSelectbox [role="button"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: none !important;
+          box-shadow: none !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        /* Number input steppers (+ / -): fără alb în partea dreaptă */
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"] [role="button"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: none !important;
+          box-shadow: none !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [data-testid="stNumberInputRootElement"] [role="button"]:hover{
+          background: rgba(30,41,59,0.72) !important;
+        }
+        /* VECHIME only: steppers (-/+) integrate dark, fără alb */
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-testid="stNumberInputRootElement"],
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-testid="stNumberInputRootElement"]{
+          background: rgba(15,23,42,0.60) !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          border-radius: 10px !important;
+          overflow: hidden !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-testid="stNumberInputRootElement"] button,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-testid="stNumberInputRootElement"] button{
+          background: rgba(15,23,42,0.60) !important;
+          color: rgba(248,250,252,0.96) !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-testid="stNumberInputRootElement"] button:hover,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-testid="stNumberInputRootElement"] button:hover{
+          background: rgba(30,41,59,0.72) !important;
+        }
+        /* Force: elimină orice alb rezidual pe steppers BaseWeb */
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-baseweb="input"] button,
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-baseweb="input"] button > div,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-baseweb="input"] button > div{
+          background: rgba(15,23,42,0.60) !important;
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-ant_ani_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-ant_luni_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-inst_ani_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-inst_luni_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fn_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-inst_fd_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-functie_ani_"] [data-baseweb="input"] button svg,
+        .st-key-emp_subtabs_box [class*="st-key-functie_luni_"] [data-baseweb="input"] button svg{
+          fill: rgba(248,250,252,0.96) !important;
+          color: rgba(248,250,252,0.96) !important;
+        }
+        /* Persoane în întreținere - acțiuni verticale, uniforme */
+        .st-key-emp_subtabs_box [class*="st-key-dep_action_btn_"] [data-testid="stFormSubmitButton"] > button{
+          width: 180px !important;
+          min-width: 180px !important;
+          max-width: 180px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          display: block !important;
+          margin-left: 0 !important;
+          margin-right: auto !important;
+          border-radius: 10px !important;
+          border: 1px solid rgba(148,163,184,0.30) !important;
+          background: rgba(15,23,42,0.60) !important;
+          color: rgba(248,250,252,0.96) !important;
+          font-weight: 700 !important;
+          box-shadow: none !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_action_btn_save_"] [data-testid="stFormSubmitButton"] > button{
+          margin-top: 8px !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_action_btn_"] [data-testid="stFormSubmitButton"] > button:hover{
+          border-color: rgba(148,163,184,0.58) !important;
+          background: rgba(30,41,59,0.72) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_action_btn_delete_"] [data-testid="stFormSubmitButton"] > button{
+          border-color: rgba(248,113,113,0.44) !important;
+          background: rgba(127,29,29,0.24) !important;
+          color: rgba(254,226,226,0.98) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-dep_action_btn_delete_"] [data-testid="stFormSubmitButton"] > button:hover{
+          border-color: rgba(248,113,113,0.66) !important;
+          background: rgba(127,29,29,0.30) !important;
         }
         /* Conținut tab-uri și expandere în fișa angajat – nu toate rotunjite */
         section.main:has(#emp-scope) div[data-testid="stTabs"] > div[data-testid="stVerticalBlockBorderWrapper"],
@@ -8691,19 +9768,27 @@ def page_angajati(conn: sqlite3.Connection):
 
         st.markdown("### Fișa angajatului")
         st.markdown("<div class='emp-detail-header'>", unsafe_allow_html=True)
-        top1, top2 = st.columns([1, 3])
+        top1, _sp = st.columns([1, 6])
         with top1:
             if st.button("⬅ Înapoi la listă", key="ang_back_to_list"):
                 st.session_state["ang_view"] = "list"
                 st.rerun()
-        with top2:
-            st.markdown(
-                f"**👤 {emp.get('last_name','')} {emp.get('first_name','')}**  ·  Marcă: **{emp.get('marca','')}**"
-            )
+        with st.container(key="emp_header_center_box"):
             cur_state = int(emp.get("activ", 1) or 0)
-            st.caption("Stare: Activ / Inactiv")
-            b1, b2, _sp = st.columns([1.0, 1.0, 3.0])
-            with b1:
+            emp_name = f"{str(emp.get('last_name','') or '').strip()} {str(emp.get('first_name','') or '').strip()}".strip()
+            emp_marca = str(emp.get("marca", "") or "").strip()
+            state_label = "ACTIV" if cur_state == 1 else "INACTIV"
+            st.markdown(
+                (
+                    "<div class='emp-header-center'>"
+                    f"<div class='emp-header-name'><strong>👤 {emp_name or '—'}</strong></div>"
+                    f"<div class='emp-header-marca'>Marcă: {emp_marca or '—'}</div>"
+                    f"<div class='emp-header-state'>Stare curentă: <strong>{state_label}</strong></div>"
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
+            with st.container(key="emp_header_actions"):
                 if st.button("✅ Activ", disabled=(cur_state == 1), key=f"ang_set_active_{emp_id}"):
                     try:
                         _employee_upsert(conn, {**emp, "activ": 1}, employee_id=emp_id)
@@ -8712,7 +9797,6 @@ def page_angajati(conn: sqlite3.Connection):
                     else:
                         st.success("Angajat activat.")
                         st.rerun()
-            with b2:
                 if st.button("⛔ Inactiv", disabled=(cur_state == 0), key=f"ang_set_inactive_{emp_id}"):
                     try:
                         _employee_upsert(conn, {**emp, "activ": 0}, employee_id=emp_id)
@@ -8723,20 +9807,22 @@ def page_angajati(conn: sqlite3.Connection):
                         st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        main_tabs_emp = st.tabs(["👤 DATE SALARIAT", "📎 DOCUMENTE / INFORMAȚII SALARIAT"]) 
+        with st.container(key="emp_main_tabs_box"):
+            main_tabs_emp = st.tabs(["👤 DATE SALARIAT", "📎 DOCUMENTE / INFORMAȚII SALARIAT"]) 
         with main_tabs_emp[0]:
-                tabs = st.tabs(
-                    [
-                        "Date personale",
-                        "Persoane în întreținere",
-                        "⏳ Vechime",
-                        "📄 Contract de muncă",
-                        "🧾 Reges Online",
-                        "🧩 COD COR",
-                        "📜 Salarizare (Legea-cadru 153/2017)", #modificat din LEGEA 153
-                                        "✏️ Editează",
-                        "🗑 Șterge"]
-                )
+                with st.container(key="emp_subtabs_box"):
+                    tabs = st.tabs(
+                        [
+                            "Date personale",
+                            "Persoane în întreținere",
+                            "⏳ Vechime",
+                            "📄 Contract de muncă",
+                            "🧾 Reges Online",
+                            "🧩 COD COR",
+                            "📜 Salarizare (Legea-cadru 153/2017)", #modificat din LEGEA 153
+                                            "✏️ Editează",
+                            "🗑 Șterge"]
+                    )
                 cols = _employees_columns(conn)
 
                 # ---------------------------
@@ -8746,13 +9832,7 @@ def page_angajati(conn: sqlite3.Connection):
                     _labels = _employee_field_labels()
                     groups = _employee_field_groups(cols)
                     for gname, gcols in groups:
-                        # Subtitluri mai mari
-                        st.markdown(
-                            f'<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">{gname}</p>',
-                            unsafe_allow_html=True,
-                        )
-                        # Toate datele în partea stângă, același font
-                        lines = []
+                        section_rows: list[tuple[str, str]] = []
                         for c in gcols:
                             label = _labels.get(c) or " ".join(p.capitalize() for p in str(c).split("_") if p) or c
                             if c == "activ":
@@ -8760,12 +9840,8 @@ def page_angajati(conn: sqlite3.Connection):
                             else:
                                 raw = emp.get(c, "")
                                 val = "" if raw is None else str(raw)
-                            v = (val or "—").replace("<", "&lt;").replace(">", "&gt;")
-                            lines.append(f'<p style="text-align:left; font-size:0.95rem; margin:0.2em 0; font-family:inherit;"><strong>{label}:</strong> {v}</p>')
-                        st.markdown(
-                            '<div style="text-align:left;">' + "".join(lines) + "</div>",
-                            unsafe_allow_html=True,
-                        )
+                            section_rows.append((label, val or "—"))
+                        _render_info_section(gname, section_rows)
                         st.divider()
 
                     # Buton export date (la finalul secțiunii; modelul raportului se poate adăuga mai târziu)
@@ -8818,6 +9894,14 @@ def page_angajati(conn: sqlite3.Connection):
                         # --------------------------------------------------------
                         st.subheader("Persoane în întreținere")
                         st.caption("Adaugă/editează persoane aflate în întreținerea angajatului (copil, părinte, soț/soție).")
+                        _render_info_section(
+                            "Context angajat",
+                            [
+                                ("Marcă", _emp_v(emp, "marca")),
+                                ("Nume complet", f"{_emp_v(emp, 'last_name', '')} {_emp_v(emp, 'first_name', '')}".strip() or "—"),
+                                ("CNP", _emp_v(emp, "cnp")),
+                            ],
+                        )
 
                         # --- helpers UI (la fel ca înainte) ---
                         TIP_OPTS = ["", "SOT_SOTIE", "COPIL", "PARINTE"]
@@ -8886,10 +9970,7 @@ def page_angajati(conn: sqlite3.Connection):
                         else:
                             df_dep = pd.DataFrame(columns=["ID", "EMPLOYEE_ID", "TIP", "NUME", "PRENUME", "CNP", "DATA_NASTERII", "GRAD_RUDENIE", "OBSERVATII", "ACTIV"])
 
-                        st.markdown(
-                            '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Listă</p>',
-                            unsafe_allow_html=True,
-                        )
+                        st.markdown('<div class="emp-block-title">Listă</div>', unsafe_allow_html=True)
                         if df_dep.empty:
                             st.info("Nu există persoane în întreținere.")
                         else:
@@ -8950,99 +10031,125 @@ def page_angajati(conn: sqlite3.Connection):
                                 }
 
                         st.divider()
-                        st.markdown(
-                            '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Detalii</p>',
-                            unsafe_allow_html=True,
-                        )
+                        st.markdown('<div class="emp-block-title">Detalii</div>', unsafe_allow_html=True)
 
                         # --- FORMULAR Detalii: restul pe 2 coloane, Grad rudenie + Observații în stânga ---
                         counter = st.session_state[f"{K}key_counter"]
 
                         with st.form(key=f"{K}form_{counter}"):
-                            col_det_a, col_det_b = st.columns(2)
+                            with st.container(key=f"{K}details_box_{counter}"):
+                                det_col, _det_sp = st.columns([1, 1])
+                                with det_col:
+                                    st.text_input("ID (auto)", value=str(cur_dep_id or ""), disabled=True, key=f"{K}id_{counter}")
 
-                            with col_det_a:
-                                st.text_input("ID (auto)", value=str(cur_dep_id or ""), disabled=True, key=f"{K}id_{counter}")
+                                    tip_cur = _norm_tip(current.get("tip"))
+                                    tip_idx = TIP_OPTS.index(tip_cur) if tip_cur in TIP_OPTS else 0
+                                    tip = st.selectbox(
+                                        "Tip",
+                                        options=TIP_OPTS,
+                                        index=tip_idx,
+                                        format_func=lambda x: TIP_LABEL.get(x, x),
+                                        key=f"{K}tip_{counter}",
+                                    )
 
-                                tip_cur = _norm_tip(current.get("tip"))
-                                tip_idx = TIP_OPTS.index(tip_cur) if tip_cur in TIP_OPTS else 0
-                                tip = st.selectbox(
-                                    "Tip",
-                                    options=TIP_OPTS,
-                                    index=tip_idx,
-                                    format_func=lambda x: TIP_LABEL.get(x, x),
-                                    key=f"{K}tip_{counter}",
-                                )
+                                    nume = st.text_input("Nume", value=current.get("nume", ""), key=f"{K}nume_{counter}")
+                                    prenume = st.text_input("Prenume", value=current.get("prenume", ""), key=f"{K}prenume_{counter}")
+                                    cnp = st.text_input(
+                                        "CNP",
+                                        value=current.get("cnp", ""),
+                                        key=f"{K}cnp_{counter}",
+                                        help="CNP-ul trebuie să aibă 13 cifre (structură S YYMMDD JJ NNN C). "
+                                             "Se validează automat data nașterii, sexul, județul și cifra de control.",
+                                    )
+                                    cnp_cleaned = cnp_clean(cnp)
+                                    if str(cnp).strip():
+                                        ok_dep_cnp, msg_dep_cnp, _ = cnp_validate(cnp)
+                                        if ok_dep_cnp:
+                                            st.caption("CNP valid.")
+                                        else:
+                                            st.caption(f"CNP invalid: {msg_dep_cnp}")
 
-                                nume = st.text_input("Nume", value=current.get("nume", ""), key=f"{K}nume_{counter}")
-                                prenume = st.text_input("Prenume", value=current.get("prenume", ""), key=f"{K}prenume_{counter}")
+                                    cnp_prefill = decode_cnp(current.get("cnp", "") or "", strict_county=False)
+                                    dob_from_db = _parse_date_any(current.get("data_nasterii", ""))
+                                    dob_default = (
+                                        cnp_prefill.birth_date if cnp_prefill.valid and cnp_prefill.birth_date
+                                        else (dob_from_db or datetime.date.today())
+                                    )
+                                    import datetime as _dt_dob
+                                    today_dob = _dt_dob.date.today()
+                                    min_dob = today_dob.replace(year=today_dob.year - 100)
+                                    max_dob = today_dob.replace(year=today_dob.year + 10)
+                                    dob = st.text_input(
+                                        "Data nașterii",
+                                        value=(dob_default.isoformat() if dob_default else ""),
+                                        key=f"{K}dob_{counter}",
+                                        help="Format acceptat: YYYY-MM-DD (ex: 1990-05-21).",
+                                    )
+                                    activ = st.checkbox("Activ", value=bool(current.get("activ", 1)), key=f"{K}activ_{counter}")
 
-                            with col_det_b:
-                                cnp = st.text_input("CNP", value=current.get("cnp", ""), key=f"{K}cnp_{counter}")
+                                    # Grad rudenie și Observații (aliniere stânga, coloană îngustă)
+                                    grad_cur = (current.get("grad_rudenie") or "").strip().upper()
+                                    if grad_cur not in GRAD_OPTS and grad_cur:
+                                        st.caption("Gradul existent nu e standard (I/II/III). Îl poți păstra la Observații.")
+                                        grad_cur = ""
+                                    suggested = _suggest_grad_for_tip(tip)
+                                    grad_default = grad_cur or suggested
+                                    grad_idx = GRAD_OPTS.index(grad_default) if grad_default in GRAD_OPTS else 0
+                                    grad_rudenie = st.selectbox(
+                                        "Grad rudenie",
+                                        options=GRAD_OPTS,
+                                        index=grad_idx,
+                                        format_func=lambda x: GRAD_LABEL.get(x, x),
+                                        key=f"{K}grad_{counter}",
+                                    )
 
-                                cnp_prefill = decode_cnp(current.get("cnp", "") or "", strict_county=False)
-                                dob_from_db = _parse_date_any(current.get("data_nasterii", ""))
-                                dob_default = (
-                                    cnp_prefill.birth_date if cnp_prefill.valid and cnp_prefill.birth_date
-                                    else (dob_from_db or datetime.date.today())
-                                )
-                                import datetime as _dt_dob
-                                today_dob = _dt_dob.date.today()
-                                min_dob = today_dob.replace(year=today_dob.year - 100)
-                                max_dob = today_dob.replace(year=today_dob.year + 10)
-                                dob = st.date_input(
-                                    "Data nașterii",
-                                    value=dob_default,
-                                    min_value=min_dob,
-                                    max_value=max_dob,
-                                    key=f"{K}dob_{counter}",
-                                )
+                                    observatii = st.text_area("Observații", value=current.get("observatii", ""), height=140, key=f"{K}obs_{counter}")
 
-                                activ = st.checkbox("Activ", value=bool(current.get("activ", 1)), key=f"{K}activ_{counter}")
-
-                            # Grad rudenie și Observații rămân în partea stângă (fără coloane)
-                            grad_cur = (current.get("grad_rudenie") or "").strip().upper()
-                            if grad_cur not in GRAD_OPTS and grad_cur:
-                                st.caption("Gradul existent nu e standard (I/II/III). Îl poți păstra la Observații.")
-                                grad_cur = ""
-                            suggested = _suggest_grad_for_tip(tip)
-                            grad_default = grad_cur or suggested
-                            grad_idx = GRAD_OPTS.index(grad_default) if grad_default in GRAD_OPTS else 0
-                            grad_rudenie = st.selectbox(
-                                "Grad rudenie",
-                                options=GRAD_OPTS,
-                                index=grad_idx,
-                                format_func=lambda x: GRAD_LABEL.get(x, x),
-                                key=f"{K}grad_{counter}",
-                            )
-
-                            observatii = st.text_area("Observații", value=current.get("observatii", ""), height=140, key=f"{K}obs_{counter}")
-
-                            is_new = cur_dep_id is None
-                            st.markdown(
-                                '<p style="color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;">Acțiuni</p>',
-                                unsafe_allow_html=True,
-                            )
-                            btn_col1, btn_col2, btn_col3 = st.columns(3)
-                            with btn_col1:
-                                save = st.form_submit_button("Adaugă în listă" if is_new else "Salvează modificările")
-                            with btn_col2:
-                                cancel = st.form_submit_button("Anulează")
-                            with btn_col3:
-                                delete = st.form_submit_button("Dezactivează persoana", disabled=is_new)
+                                    is_new = cur_dep_id is None
+                                    st.markdown('<div class="emp-block-title">Acțiuni</div>', unsafe_allow_html=True)
+                                    save = st.form_submit_button(
+                                        "Adaugă în listă" if is_new else "Salvează modificările",
+                                        key=f"dep_action_btn_save_{emp_id}_{counter}",
+                                        use_container_width=False,
+                                    )
+                                    cancel = st.form_submit_button(
+                                        "Anulează",
+                                        key=f"dep_action_btn_cancel_{emp_id}_{counter}",
+                                        use_container_width=False,
+                                    )
+                                    delete = st.form_submit_button(
+                                        "Dezactivează persoana",
+                                        disabled=is_new,
+                                        key=f"dep_action_btn_delete_{emp_id}_{counter}",
+                                        use_container_width=False,
+                                    )
 
                         if cancel:
                             st.session_state[f"{K}reset_pending"] = True
                             st.rerun()
 
                         if save:
+                            dob_date = _parse_date_any(str(dob))
+                            if not dob_date:
+                                st.error("Data nașterii este invalidă. Folosește formatul YYYY-MM-DD.")
+                                st.stop()
+                            if dob_date < min_dob or dob_date > max_dob:
+                                st.error("Data nașterii este în afara intervalului permis.")
+                                st.stop()
+
+                            if str(cnp).strip():
+                                ok_dep_cnp, msg_dep_cnp, _ = cnp_validate(cnp)
+                                if not ok_dep_cnp:
+                                    st.error(f"CNP invalid: {msg_dep_cnp}")
+                                    st.stop()
+
                             dep_values = {
                                 "employee_id": emp_id,
                                 "tip": tip,
                                 "nume": nume,
                                 "prenume": prenume,
-                                "cnp": cnp,
-                                "data_nasterii": dob.isoformat() if dob else "",
+                                "cnp": cnp_cleaned if str(cnp).strip() else "",
+                                "data_nasterii": dob_date.isoformat() if dob_date else "",
                                 "grad_rudenie": grad_rudenie,
                                 "observatii": observatii,
                                 "activ": 1 if activ else 0,
@@ -9064,36 +10171,16 @@ def page_angajati(conn: sqlite3.Connection):
                 # ---------------------------------------------------------------------------------#
     
                 with tabs[2]:
-                    st.markdown(
-                        "<p style=\"color:#000; font-weight:800; font-size:1.6rem; margin:0.6em 0 0.4em 0; "
-                        "border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;\">Vechime</p>",
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown('<div class="emp-block-title">Vechime</div>', unsafe_allow_html=True)
                     st.caption("Gestionare vechime instituție, vechime anterioară în muncă și overview + raport vechime PDF.")
-
-                    # UI polishing - carduri și stilizare custom pentru secțiunea vechime
-                    st.markdown(
-                        """
-                        <style>
-                        .s-card {
-                          background: rgba(15,23,42,0.95);
-                          border: 1px solid var(--border, #263244);
-                          border-radius: 6px;
-                          padding: 16px 18px;
-                          margin-bottom: 14px;
-                        }
-                        .s-title { font-size: 18px; font-weight: 700; margin: 0.4em 0 0.4em 0; border-bottom: 1px solid rgba(0,0,0,0.25); padding-bottom: 0.35em; }
-                        .s-muted { color: var(--muted2, #CBD5E1); opacity: 1; font-size: 13px; }
-                        .s-pill {
-                          display:inline-block; padding: 6px 10px; border-radius: 999px;
-                          background: var(--tab-bg, #0B1220);
-                          border: 1px solid var(--tab-border, #263244);
-                          margin-right: 8px; margin-top: 6px;
-                          font-size: 13px;
-                        }
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
+                    _render_info_section(
+                        "Context vechime",
+                        [
+                            ("Marcă", _emp_v(emp, "marca")),
+                            ("Data angajare", _emp_v(emp, "data_angajarii", _emp_v(emp, "data_angajare"))),
+                            ("Data plecării", _emp_v(emp, "data_plecarii")),
+                            ("Vechime anterioară", f"{_emp_v(emp, 'vechime_anterioara_ani', '0')} ani, {_emp_v(emp, 'vechime_anterioara_luni', '0')} luni"),
+                        ],
                     )
 
                     # =========================
@@ -9233,42 +10320,33 @@ def page_angajati(conn: sqlite3.Connection):
                     # 1) DATE ANGAJARE / PLECARE (LIVE)
                     # =========================
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
                     st.markdown('<div class="s-title">Date angajare / plecare</div>', unsafe_allow_html=True)
-                    st.markdown('<div class="s-muted">Aceste date controlează calculul automat pentru vechimea în instituție.</div>', unsafe_allow_html=True)
 
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        _ang_default = _parse_date_any(data_angaj) or datetime.date.today()
-                        _today = datetime.date.today()
-                        _min_d = _today.replace(year=_today.year - 100)
-                        _max_d = _today.replace(year=_today.year + 10)
-                        data_ang_date = st.date_input(
-                            "Data angajării",
-                            value=_ang_default,
-                            min_value=_min_d,
-                            max_value=_max_d,
-                            key=f"data_ang_date_{emp_id}",
-                        )
-
-                    with col2:
-                        still_active = st.checkbox(
-                            "Încă activ",
-                            value=(data_plecarii == ""),
-                            key=f"still_active_{emp_id}",
-                        )
-
-                    with col3:
-                        _plec_default = _parse_date_any(data_plecarii) or datetime.date.today()
-                        data_plec_date = st.date_input(
-                            "Data plecării",
-                            value=_plec_default,
-                            min_value=_min_d,
-                            max_value=_max_d,
-                            disabled=still_active,
-                            key=f"data_plec_date_{emp_id}",
-                        )
+                    _ang_default = _parse_date_any(data_angaj) or datetime.date.today()
+                    _today = datetime.date.today()
+                    _min_d = _today.replace(year=_today.year - 100)
+                    _max_d = _today.replace(year=_today.year + 10)
+                    data_ang_date = st.date_input(
+                        "Data angajării",
+                        value=_ang_default,
+                        min_value=_min_d,
+                        max_value=_max_d,
+                        key=f"data_ang_date_{emp_id}",
+                    )
+                    still_active = st.checkbox(
+                        "Încă activ",
+                        value=(data_plecarii == ""),
+                        key=f"still_active_{emp_id}",
+                    )
+                    _plec_default = _parse_date_any(data_plecarii) or datetime.date.today()
+                    data_plec_date = st.date_input(
+                        "Data plecării",
+                        value=_plec_default,
+                        min_value=_min_d,
+                        max_value=_max_d,
+                        disabled=still_active,
+                        key=f"data_plec_date_{emp_id}",
+                    )
 
                     data_ang = data_ang_date.isoformat() if data_ang_date else ""
                     data_plec = "" if still_active else (data_plec_date.isoformat() if data_plec_date else "")
@@ -9300,65 +10378,61 @@ def page_angajati(conn: sqlite3.Connection):
                         inst_y, inst_m, inst_d = int(v_inst_ani), int(v_inst_luni), int(v_inst_fn)
                         inst_den = int(v_inst_fd) if int(v_inst_fd) != 0 else 30
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">Vechime în instituție</div>', unsafe_allow_html=True)
-                    st.markdown('<div class="s-muted">Dacă bifezi calcul automat, câmpurile devin doar afișaj.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-block-title">Vechime în instituție</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-vechime-note">Dacă bifezi calcul automat, câmpurile devin doar afișaj.</div>', unsafe_allow_html=True)
 
                     if auto_calc_inst and data_ang_date:
-                        st.info(f"Vechime calculată: **{inst_y} ani, {inst_m} luni, {inst_d} zile** (salvat ca {inst_d}/{inst_den}).")
+                        st.markdown(
+                            f'<div class="emp-vechime-status"><strong>Vechime calculată:</strong> {inst_y} ani, {inst_m} luni, {inst_d} zile (salvat ca {inst_d}/{inst_den}).</div>',
+                            unsafe_allow_html=True,
+                        )
                     else:
-                        st.markdown('<span class="s-pill">Calcul manual</span>', unsafe_allow_html=True)
+                        st.markdown('<div class="emp-vechime-status">Calcul manual.</div>', unsafe_allow_html=True)
 
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("", unsafe_allow_html=True)
 
                     # =========================
                     # 4) VECHIME ANTERIOARĂ (SAVE SEPARAT + LOCK)
                     # =========================
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">Vechime în muncă până la angajare</div>', unsafe_allow_html=True)
-                    st.markdown('<div class="s-muted">Se salvează separat. Implicit este blocată până alegi „Modifică”.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-block-title">Vechime în muncă până la angajare</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-vechime-note">Se salvează separat. Implicit este blocată până alegi „Modifică”.</div>', unsafe_allow_html=True)
 
                     # diana – lock/edit toggler pentru vechime anterioară
                     ant_edit_key = f"ant_edit_{emp_id}"
                     if ant_edit_key not in st.session_state:
                         st.session_state[ant_edit_key] = False
 
-                    cA, cB = st.columns([1, 3])
-                    with cA:
-                        if not st.session_state[ant_edit_key]:
-                            if st.button("Modifică", key=f"ant_edit_btn_{emp_id}"):
-                                st.session_state[ant_edit_key] = True
-                                st.rerun()
-                        else:
-                            if st.button("Blochează", key=f"ant_lock_btn_{emp_id}"):
-                                st.session_state[ant_edit_key] = False
-                                st.rerun()
+                    if not st.session_state[ant_edit_key]:
+                        if st.button("Modifică", key=f"ant_edit_btn_{emp_id}"):
+                            st.session_state[ant_edit_key] = True
+                            st.rerun()
+                    else:
+                        if st.button("Blochează", key=f"ant_lock_btn_{emp_id}"):
+                            st.session_state[ant_edit_key] = False
+                            st.rerun()
 
                     disabled_ant = not st.session_state[ant_edit_key]
 
                     with st.form(key=f"ant_work_form_{emp_id}"):
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            ant_ani = st.number_input(
-                                "Ani (anterioară)",
-                                min_value=0,
-                                max_value=60,
-                                value=int(v_ant_ani),
-                                step=1,
-                                disabled=disabled_ant,
-                                key=f"ant_ani_{emp_id}",
-                            )
-                        with c2:
-                            ant_luni = st.number_input(
-                                "Luni (anterioară)",
-                                min_value=0,
-                                max_value=11,
-                                value=int(v_ant_luni),
-                                step=1,
-                                disabled=disabled_ant,
-                                key=f"ant_luni_{emp_id}",
-                            )
+                        ant_ani = st.number_input(
+                            "Ani (anterioară)",
+                            min_value=0,
+                            max_value=60,
+                            value=int(v_ant_ani),
+                            step=1,
+                            disabled=disabled_ant,
+                            key=f"ant_ani_{emp_id}",
+                        )
+                        ant_luni = st.number_input(
+                            "Luni (anterioară)",
+                            min_value=0,
+                            max_value=11,
+                            value=int(v_ant_luni),
+                            step=1,
+                            disabled=disabled_ant,
+                            key=f"ant_luni_{emp_id}",
+                        )
 
                         save_ant = st.form_submit_button(
                             "Salvează vechime anterioară",
@@ -9378,86 +10452,70 @@ def page_angajati(conn: sqlite3.Connection):
                         st.success("Vechime anterioară salvată.")
                         st.rerun()
 
-                    st.markdown("</div>", unsafe_allow_html=True)
-
                     # =========================
                     # 5) FORM PRINCIPAL: VECHIME INSTITUȚIE + FUNCȚIE (SAVE)
                     # =========================
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
                     st.markdown('<div class="s-title">Salvare vechime instituție / funcție</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Aici salvezi valorile instituției (manual sau auto-calc) și vechimea în funcție.</div>', unsafe_allow_html=True)
 
                     with st.form(key=f"vechime_form_{emp_id}"):
 
-                        st.markdown("#### 🏢 Vechime în instituție (salvare)")
-                        c1, c2, c3, c4 = st.columns([1, 1, 1.2, 1.2])
-
-                        with c1:
-                            inst_ani_input = st.number_input(
-                                "Ani (instituție)",
-                                min_value=0,
-                                max_value=60,
-                                value=int(v_inst_ani),
-                                step=1,
-                                disabled=lock_inst_fields,
-                                key=f"inst_ani_{emp_id}",
-                            )
-                        with c2:
-                            inst_luni_input = st.number_input(
-                                "Luni (instituție)",
-                                min_value=0,
-                                max_value=11,
-                                value=int(v_inst_luni),
-                                step=1,
-                                disabled=lock_inst_fields,
-                                key=f"inst_luni_{emp_id}",
-                            )
-                        with c3:
-                            inst_fn_input = st.number_input(
-                                "Zile lună curentă",
-                                min_value=0,
-                                max_value=31,
-                                value=int(v_inst_fn),
-                                step=1,
-                                disabled=lock_inst_fields,
-                                key=f"inst_fn_{emp_id}",
-                            )
-                        with c4:
-                            inst_fd_input = st.number_input(
-                                "Bază raportare lună (zile)",
-                                min_value=28,
-                                max_value=31,
-                                value=int(v_inst_fd) if int(v_inst_fd) != 0 else 30,
-                                step=1,
-                                disabled=lock_inst_fields,
-                                key=f"inst_fd_{emp_id}",
-                            )
-
-                        st.markdown(
-                            "<p style=\"color:#000; font-weight:700; font-size:1.35rem; margin:0.6em 0 0.4em 0; "
-                            "border-bottom:1px solid rgba(0,0,0,0.25); padding-bottom:0.35em;\">Vechime în funcție</p>",
-                            unsafe_allow_html=True,
+                        st.markdown('<div class="emp-block-title">🏢 Vechime în instituție (salvare)</div>', unsafe_allow_html=True)
+                        inst_ani_input = st.number_input(
+                            "Ani (instituție)",
+                            min_value=0,
+                            max_value=60,
+                            value=int(v_inst_ani),
+                            step=1,
+                            disabled=lock_inst_fields,
+                            key=f"inst_ani_{emp_id}",
                         )
-                        f1, f2 = st.columns(2)
-                        with f1:
-                            functie_ani = st.number_input(
-                                "Ani (funcție)",
-                                min_value=0,
-                                max_value=60,
-                                value=int(v_functie_ani),
-                                step=1,
-                                key=f"functie_ani_{emp_id}",
-                            )
-                        with f2:
-                            functie_luni = st.number_input(
-                                "Luni (funcție)",
-                                min_value=0,
-                                max_value=11,
-                                value=int(v_functie_luni),
-                                step=1,
-                                key=f"functie_luni_{emp_id}",
-                            )
+                        inst_luni_input = st.number_input(
+                            "Luni (instituție)",
+                            min_value=0,
+                            max_value=11,
+                            value=int(v_inst_luni),
+                            step=1,
+                            disabled=lock_inst_fields,
+                            key=f"inst_luni_{emp_id}",
+                        )
+                        inst_fn_input = st.number_input(
+                            "Zile lună curentă",
+                            min_value=0,
+                            max_value=31,
+                            value=int(v_inst_fn),
+                            step=1,
+                            disabled=lock_inst_fields,
+                            key=f"inst_fn_{emp_id}",
+                        )
+                        inst_fd_input = st.number_input(
+                            "Bază raportare lună (zile)",
+                            min_value=28,
+                            max_value=31,
+                            value=int(v_inst_fd) if int(v_inst_fd) != 0 else 30,
+                            step=1,
+                            disabled=lock_inst_fields,
+                            key=f"inst_fd_{emp_id}",
+                        )
+
+                        st.markdown('<div class="emp-block-title">Vechime în funcție</div>', unsafe_allow_html=True)
+                        functie_ani = st.number_input(
+                            "Ani (funcție)",
+                            min_value=0,
+                            max_value=60,
+                            value=int(v_functie_ani),
+                            step=1,
+                            key=f"functie_ani_{emp_id}",
+                        )
+                        functie_luni = st.number_input(
+                            "Luni (funcție)",
+                            min_value=0,
+                            max_value=11,
+                            value=int(v_functie_luni),
+                            step=1,
+                            key=f"functie_luni_{emp_id}",
+                        )
 
                         save_main = st.form_submit_button("Salvează (instituție + funcție)")
 
@@ -9499,8 +10557,6 @@ def page_angajati(conn: sqlite3.Connection):
                         st.success("Vechime instituție + funcție salvată.")
                         st.rerun()
 
-                    st.markdown("</div>", unsafe_allow_html=True)
-
                     # =========================
                     # 6) OVERVIEW TOTAL (VIZUAL)
                     # =========================
@@ -9510,49 +10566,53 @@ def page_angajati(conn: sqlite3.Connection):
                     total_y = total_months // 12
                     total_m = total_months % 12
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
-                    st.markdown('<div class="s-title">📊 Overview vechime</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-block-title">📊 Sinteză vechime</div>', unsafe_allow_html=True)
+                    st.markdown("", unsafe_allow_html=True)
 
-                    r1, r2, r3 = st.columns(3)
-
-                    with r1:
-                        st.markdown("**Vechime în instituție**")
-                        st.markdown(
+                    st.markdown("**1) Vechime în instituție**")
+                    st.markdown(
+                        (
+                            '<div class="emp-overview-pills">'
                             f'<span class="s-pill">{int(inst_y)} ani</span>'
                             f'<span class="s-pill">{int(inst_m)} luni</span>'
-                            f'<span class="s-pill">{int(inst_d)}/{int(inst_den)} zile</span>',
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown(
-                            f'<div class="s-muted">Din {data_ang or "—"} până la {("azi" if still_active else (data_plec or "—"))}</div>',
-                            unsafe_allow_html=True,
-                        )
-
-                    with r2:
-                        st.markdown("**Vechime anterioară (muncă)**")
-                        st.markdown(
+                            f'<span class="s-pill">{int(inst_d)}/{int(inst_den)} zile</span>'
+                            '</div>'
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="s-muted">Din {data_ang or "—"} până la {("azi" if still_active else (data_plec or "—"))}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown('<div class="emp-overview-sep"></div>', unsafe_allow_html=True)
+                    st.markdown("**2) Vechime anterioară (muncă)**")
+                    st.markdown(
+                        (
+                            '<div class="emp-overview-pills">'
                             f'<span class="s-pill">{int(v_ant_ani)} ani</span>'
-                            f'<span class="s-pill">{int(v_ant_luni)} luni</span>',
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown('<div class="s-muted">Completată manual (dosar profesional).</div>', unsafe_allow_html=True)
-
-                    with r3:
-                        st.markdown("**Vechime totală (muncă)**")
-                        st.markdown(
+                            f'<span class="s-pill">{int(v_ant_luni)} luni</span>'
+                            '</div>'
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown('<div class="s-muted">Completată manual (dosar profesional).</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="emp-overview-sep"></div>', unsafe_allow_html=True)
+                    st.markdown("**3) Vechime totală (muncă)**")
+                    st.markdown(
+                        (
+                            '<div class="emp-overview-pills">'
                             f'<span class="s-pill">{int(total_y)} ani</span>'
-                            f'<span class="s-pill">{int(total_m)} luni</span>',
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown('<div class="s-muted">Total = anterioară + instituție (zilele rămân separat).</div>', unsafe_allow_html=True)
-
-                    st.markdown("</div>", unsafe_allow_html=True)
+                            f'<span class="s-pill">{int(total_m)} luni</span>'
+                            '</div>'
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown("", unsafe_allow_html=True)
 
                     # =========================
                     # 7) RAPORT PDF
                     # =========================
 
-                    st.markdown('<div class="s-card">', unsafe_allow_html=True)
                     st.markdown('<div class="s-title">📄 Raport</div>', unsafe_allow_html=True)
                     st.markdown('<div class="s-muted">Generează un raport PDF pentru dosar profesional / raportări.</div>', unsafe_allow_html=True)
 
@@ -9589,7 +10649,7 @@ def page_angajati(conn: sqlite3.Connection):
                             key=f"dl_report_{emp_id}",
                         )
 
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("", unsafe_allow_html=True)
 
                 # ---------------------------
                 # TAB 3: Editează (formular complet)
@@ -9598,15 +10658,20 @@ def page_angajati(conn: sqlite3.Connection):
                 # ---------------------------
                 with tabs[7]:
                     st.info(
-                        "Modificările aici se vor reflecta automat în Organigramă / Dosar Profesional / Pontaj / Centralizator concedii, "
-                        "deoarece toate folosesc tabela employees."
+                        "Editezi datele principale ale angajatului. Modificările salvate se propagă automat în modulele care citesc "
+                        "din tabela employees (Organigramă, Dosar profesional, Pontaj, Centralizator concedii)."
                     )
-                    with st.form("ang_edit_form"):
-                        values = _render_employee_form_fields(emp, cols, prefix=f"ang_edit_{emp_id}")
-                        c_save, c_cancel = st.columns([1, 1])
-                        with c_save:
+                    with st.container(key="ang_edit_panel"):
+                        with st.form("ang_edit_form"):
+                            values = _render_employee_form_fields(
+                                emp,
+                                cols,
+                                prefix=f"ang_edit_{emp_id}",
+                                single_column=True,
+                                fine_section_titles=True,
+                                parallel_groups=True,
+                            )
                             submitted = st.form_submit_button("💾 Salvează modificările")
-                        with c_cancel:
                             cancel = st.form_submit_button("↩ Renunță")
 
                     if cancel:
@@ -9627,6 +10692,15 @@ def page_angajati(conn: sqlite3.Connection):
                 # ---------------------------
                 with tabs[3]:
                     st.subheader("📄 Contract de muncă (CIM)")
+                    _render_info_section(
+                        "Date contract curente",
+                        [
+                            ("Marcă", _emp_v(emp, "marca")),
+                            ("Funcție", _emp_v(emp, "functie")),
+                            ("Cod COR", _emp_v(emp, "cod_cor")),
+                            ("Tip contract", _emp_v(emp, "tip_contract")),
+                        ],
+                    )
 
                     # =========================================================
                     # Formular CIM (structurat) – câmpurile care trebuie să apară
@@ -9659,114 +10733,89 @@ def page_angajati(conn: sqlite3.Connection):
                     _cnp_here = str(emp.get("cnp") or emp.get("CNP") or "").strip()
                     _dob_auto = _format_ro_date(cnp_birthdate(_cnp_here))
 
-                    with st.expander("I. Datele părților (Angajator și Angajat)", expanded=True):
-                        cA, cB = st.columns(2)
+                    st.markdown('<div class="emp-section-title">I. Datele părților (Angajator și Angajat)</div>', unsafe_allow_html=True)
+                    if True:
+                        st.markdown('<div class="emp-subsection-title">A) Angajator (din Configurație)</div>', unsafe_allow_html=True)
+                        _cim["ANGAJATOR_DEN"] = st.text_input("Denumire firmă", value=_cim_get("ANGAJATOR_DEN", _cfg_pick("denumire_unitate")), key=f"cim_{emp_id}_ANGAJATOR_DEN")
+                        _cim["ANGAJATOR_SEDIU"] = st.text_input("Sediu social", value=_cim_get("ANGAJATOR_SEDIU", _cfg_pick("adresa")), key=f"cim_{emp_id}_ANGAJATOR_SEDIU")
+                        _cim["ANGAJATOR_CUI"] = st.text_input("CUI", value=_cim_get("ANGAJATOR_CUI", _cfg_pick("cui")), key=f"cim_{emp_id}_ANGAJATOR_CUI")
+                        _cim["ANGAJATOR_REG"] = st.text_input("Nr. Reg. Comerțului", value=_cim_get("ANGAJATOR_REG", _cfg_pick("reg_comertului","nr_reg_comertului")), key=f"cim_{emp_id}_ANGAJATOR_REG")
+                        _cim["ANGAJATOR_REPREZENTANT"] = st.text_input("Reprezentant legal", value=_cim_get("ANGAJATOR_REPREZENTANT", _cfg_pick("conducator_nume")), key=f"cim_{emp_id}_ANGAJATOR_REPREZENTANT")
+                        _cim["ANGAJATOR_CALITATE"] = st.text_input("Calitate", value=_cim_get("ANGAJATOR_CALITATE", _cfg_pick("conducator_functie")), key=f"cim_{emp_id}_ANGAJATOR_CALITATE")
+                        _cim["ANGAJATOR_TEL"] = st.text_input("Telefon", value=_cim_get("ANGAJATOR_TEL", _cfg_pick("telefon")), key=f"cim_{emp_id}_ANGAJATOR_TEL")
+                        _cim["ANGAJATOR_PUNCT"] = st.text_input("Punct de lucru (opțional)", value=_cim_get("ANGAJATOR_PUNCT", _cfg_pick("punct_lucru")), key=f"cim_{emp_id}_ANGAJATOR_PUNCT")
 
-                        with cA:
-                            st.markdown("### A) Angajator (din Configurație)")
-                            _cim["ANGAJATOR_DEN"] = st.text_input("Denumire firmă", value=_cim_get("ANGAJATOR_DEN", _cfg_pick("denumire_unitate")), key=f"cim_{emp_id}_ANGAJATOR_DEN")
-                            _cim["ANGAJATOR_SEDIU"] = st.text_input("Sediu social", value=_cim_get("ANGAJATOR_SEDIU", _cfg_pick("adresa")), key=f"cim_{emp_id}_ANGAJATOR_SEDIU")
-                            _cim["ANGAJATOR_CUI"] = st.text_input("CUI", value=_cim_get("ANGAJATOR_CUI", _cfg_pick("cui")), key=f"cim_{emp_id}_ANGAJATOR_CUI")
-                            _cim["ANGAJATOR_REG"] = st.text_input("Nr. Reg. Comerțului", value=_cim_get("ANGAJATOR_REG", _cfg_pick("reg_comertului","nr_reg_comertului")), key=f"cim_{emp_id}_ANGAJATOR_REG")
-                            _cim["ANGAJATOR_REPREZENTANT"] = st.text_input("Reprezentant legal", value=_cim_get("ANGAJATOR_REPREZENTANT", _cfg_pick("conducator_nume")), key=f"cim_{emp_id}_ANGAJATOR_REPREZENTANT")
-                            _cim["ANGAJATOR_CALITATE"] = st.text_input("Calitate", value=_cim_get("ANGAJATOR_CALITATE", _cfg_pick("conducator_functie")), key=f"cim_{emp_id}_ANGAJATOR_CALITATE")
-                            _cim["ANGAJATOR_TEL"] = st.text_input("Telefon", value=_cim_get("ANGAJATOR_TEL", _cfg_pick("telefon")), key=f"cim_{emp_id}_ANGAJATOR_TEL")
-                            _cim["ANGAJATOR_PUNCT"] = st.text_input("Punct de lucru (opțional)", value=_cim_get("ANGAJATOR_PUNCT", _cfg_pick("punct_lucru")), key=f"cim_{emp_id}_ANGAJATOR_PUNCT")
+                        st.markdown('<div class="emp-subsection-title">B) Angajat (din EMPLOYEES + DATE_ANGAJATI)</div>', unsafe_allow_html=True)
+                        _cim["SALARIAT_NUME"] = st.text_input("Nume", value=_cim_get("SALARIAT_NUME", str(get_val(emp, "last_name","LAST_NAME","nume","NUME") or "")), key=f"cim_{emp_id}_SALARIAT_NUME")
+                        _cim["SALARIAT_PRENUME"] = st.text_input("Prenume", value=_cim_get("SALARIAT_PRENUME", str(get_val(emp, "first_name","FIRST_NAME","prenume","PRENUME") or "")), key=f"cim_{emp_id}_SALARIAT_PRENUME")
+                        _cim["CNP"] = st.text_input("CNP", value=_cim_get("CNP", _cnp_here), key=f"cim_{emp_id}_CNP")
 
-                        with cB:
-                            st.markdown("### B) Angajat (din EMPLOYEES + DATE_ANGAJATI)")
-                            _cim["SALARIAT_NUME"] = st.text_input("Nume", value=_cim_get("SALARIAT_NUME", str(get_val(emp, "last_name","LAST_NAME","nume","NUME") or "")), key=f"cim_{emp_id}_SALARIAT_NUME")
-                            _cim["SALARIAT_PRENUME"] = st.text_input("Prenume", value=_cim_get("SALARIAT_PRENUME", str(get_val(emp, "first_name","FIRST_NAME","prenume","PRENUME") or "")), key=f"cim_{emp_id}_SALARIAT_PRENUME")
-                            _cim["CNP"] = st.text_input("CNP", value=_cim_get("CNP", _cnp_here), key=f"cim_{emp_id}_CNP")
+                        st.markdown("**Domiciliu**")
+                        _cim["SALARIAT_LOCALITATE"] = st.text_input("Localitate", value=_cim_get("SALARIAT_LOCALITATE", mapping.get("SALARIAT_LOCALITATE","")), key=f"cim_{emp_id}_SALARIAT_LOCALITATE")
+                        _cim["SALARIAT_JUDET"] = st.text_input("Județ", value=_cim_get("SALARIAT_JUDET", mapping.get("SALARIAT_JUDET","")), key=f"cim_{emp_id}_SALARIAT_JUDET")
+                        _cim["SALARIAT_STRADA"] = st.text_input("Strada", value=_cim_get("SALARIAT_STRADA", mapping.get("SALARIAT_STRADA","")), key=f"cim_{emp_id}_SALARIAT_STRADA")
+                        _cim["SALARIAT_NR_STR"] = st.text_input("Nr.", value=_cim_get("SALARIAT_NR_STR", mapping.get("SALARIAT_NR_STR","")), key=f"cim_{emp_id}_SALARIAT_NR_STR")
 
-                            st.markdown("**Domiciliu**")
-                            _cim["SALARIAT_LOCALITATE"] = st.text_input("Localitate", value=_cim_get("SALARIAT_LOCALITATE", mapping.get("SALARIAT_LOCALITATE","")), key=f"cim_{emp_id}_SALARIAT_LOCALITATE")
-                            _cim["SALARIAT_JUDET"] = st.text_input("Județ", value=_cim_get("SALARIAT_JUDET", mapping.get("SALARIAT_JUDET","")), key=f"cim_{emp_id}_SALARIAT_JUDET")
-                            _cim["SALARIAT_STRADA"] = st.text_input("Strada", value=_cim_get("SALARIAT_STRADA", mapping.get("SALARIAT_STRADA","")), key=f"cim_{emp_id}_SALARIAT_STRADA")
-                            _cim["SALARIAT_NR_STR"] = st.text_input("Nr.", value=_cim_get("SALARIAT_NR_STR", mapping.get("SALARIAT_NR_STR","")), key=f"cim_{emp_id}_SALARIAT_NR_STR")
+                        st.markdown("**CI / Pașaport**")
+                        _cim["CI_TIP"] = st.text_input("Tip act", value=_cim_get("CI_TIP", mapping.get("CI_TIP","CI")), key=f"cim_{emp_id}_CI_TIP")
+                        _cim["CI_SERIE"] = st.text_input("Serie", value=_cim_get("CI_SERIE", mapping.get("CI_SERIE","")), key=f"cim_{emp_id}_CI_SERIE")
+                        _cim["CI_NR"] = st.text_input("Număr", value=_cim_get("CI_NR", mapping.get("CI_NR","")), key=f"cim_{emp_id}_CI_NR")
+                        _cim["CI_ELIBERAT_DE"] = st.text_input("Eliberat de", value=_cim_get("CI_ELIBERAT_DE", mapping.get("CI_ELIBERAT_DE","")), key=f"cim_{emp_id}_CI_ELIBERAT_DE")
+                        _cim["CI_DATA"] = st.text_input("Data eliberării (dd.mm.yyyy)", value=_cim_get("CI_DATA", mapping.get("CI_DATA","")), key=f"cim_{emp_id}_CI_DATA")
 
-                            st.markdown("**CI / Pașaport**")
-                            _cim["CI_TIP"] = st.text_input("Tip act", value=_cim_get("CI_TIP", mapping.get("CI_TIP","CI")), key=f"cim_{emp_id}_CI_TIP")
-                            _cim["CI_SERIE"] = st.text_input("Serie", value=_cim_get("CI_SERIE", mapping.get("CI_SERIE","")), key=f"cim_{emp_id}_CI_SERIE")
-                            _cim["CI_NR"] = st.text_input("Număr", value=_cim_get("CI_NR", mapping.get("CI_NR","")), key=f"cim_{emp_id}_CI_NR")
-                            _cim["CI_ELIBERAT_DE"] = st.text_input("Eliberat de", value=_cim_get("CI_ELIBERAT_DE", mapping.get("CI_ELIBERAT_DE","")), key=f"cim_{emp_id}_CI_ELIBERAT_DE")
-                            _cim["CI_DATA"] = st.text_input("Data eliberării (dd.mm.yyyy)", value=_cim_get("CI_DATA", mapping.get("CI_DATA","")), key=f"cim_{emp_id}_CI_DATA")
+                        _cim["DATA_NASTERE"] = st.text_input("Data nașterii (dd.mm.yyyy) – auto din CNP", value=_cim_get("DATA_NASTERE", mapping.get("DATA_NASTERE","") or _dob_auto), key=f"cim_{emp_id}_DATA_NASTERE")
+                        _cim["STUDII"] = st.text_input("Studii", value=_cim_get("STUDII", mapping.get("STUDII","")), key=f"cim_{emp_id}_STUDII")
+                        _cim["OCUPATIE_TEXT"] = st.text_input("Ocupație (text)", value=_cim_get("OCUPATIE_TEXT", mapping.get("OCUPATIE_TEXT","")), key=f"cim_{emp_id}_OCUPATIE_TEXT")
 
-                            _cim["DATA_NASTERE"] = st.text_input("Data nașterii (dd.mm.yyyy) – auto din CNP", value=_cim_get("DATA_NASTERE", mapping.get("DATA_NASTERE","") or _dob_auto), key=f"cim_{emp_id}_DATA_NASTERE")
-                            _cim["STUDII"] = st.text_input("Studii", value=_cim_get("STUDII", mapping.get("STUDII","")), key=f"cim_{emp_id}_STUDII")
-                            _cim["OCUPATIE_TEXT"] = st.text_input("Ocupație (text)", value=_cim_get("OCUPATIE_TEXT", mapping.get("OCUPATIE_TEXT","")), key=f"cim_{emp_id}_OCUPATIE_TEXT")
+                    st.markdown('<div class="emp-section-title">II. Detalii contractuale (obligatorii)</div>', unsafe_allow_html=True)
+                    if True:
+                        st.markdown('<div class="emp-subsubsection-title">A) Identificare contract</div>', unsafe_allow_html=True)
+                        _cim["CIM_NR"] = st.text_input("Număr CIM", value=_cim_get("CIM_NR", mapping.get("CIM_NR","")), key=f"cim_{emp_id}_CIM_NR")
+                        _cim["CIM_DATA"] = st.text_input("Data încheierii/semnării (dd.mm.yyyy)", value=_cim_get("CIM_DATA", mapping.get("CIM_DATA","")), key=f"cim_{emp_id}_CIM_DATA")
 
-                    with st.expander("II. Detalii contractuale (obligatorii)", expanded=True):
-                        st.markdown("### A) Identificare contract")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            _cim["CIM_NR"] = st.text_input("Număr CIM", value=_cim_get("CIM_NR", mapping.get("CIM_NR","")), key=f"cim_{emp_id}_CIM_NR")
-                        with c2:
-                            _cim["CIM_DATA"] = st.text_input("Data încheierii/semnării (dd.mm.yyyy)", value=_cim_get("CIM_DATA", mapping.get("CIM_DATA","")), key=f"cim_{emp_id}_CIM_DATA")
-
-                        st.markdown("### B) Obiectul contractului")
-                        c3, c4 = st.columns(2)
-                        with c3:
-                            _cim["FUNCTIE"] = st.text_input("Funcție (denumire)", value=_cim_get("FUNCTIE", mapping.get("FUNCTIE","")), key=f"cim_{emp_id}_FUNCTIE")
-                        with c4:
-                            _cim["COR"] = st.text_input("Cod COR", value=_cim_get("COR", mapping.get("COR","")), key=f"cim_{emp_id}_COR")
+                        st.markdown('<div class="emp-subsubsection-title">B) Obiectul contractului</div>', unsafe_allow_html=True)
+                        _cim["FUNCTIE"] = st.text_input("Funcție (denumire)", value=_cim_get("FUNCTIE", mapping.get("FUNCTIE","")), key=f"cim_{emp_id}_FUNCTIE")
+                        _cim["COR"] = st.text_input("Cod COR", value=_cim_get("COR", mapping.get("COR","")), key=f"cim_{emp_id}_COR")
                         _cim["SARCINI_SUMAR"] = st.text_area("Descriere succintă sarcini", value=_cim_get("SARCINI_SUMAR", mapping.get("SARCINI_SUMAR","")), key=f"cim_{emp_id}_SARCINI_SUMAR", height=120)
 
-                        st.markdown("### C) Locul muncii")
+                        st.markdown('<div class="emp-subsubsection-title">C) Locul muncii</div>', unsafe_allow_html=True)
                         _cim["LOC_MUNCA_ADRESA"] = st.text_input("Adresa exactă", value=_cim_get("LOC_MUNCA_ADRESA", mapping.get("LOC_MUNCA_ADRESA","")), key=f"cim_{emp_id}_LOC_MUNCA_ADRESA")
-                        col_fx, col_txt = st.columns([1, 3])
-                        with col_fx:
-                            _cim["LOC_MUNCA_FARA_FIX"] = st.checkbox("Fără loc fix", value=bool(_cim_get("LOC_MUNCA_FARA_FIX", False)), key=f"cim_{emp_id}_LOC_MUNCA_FARA_FIX")
-                        with col_txt:
-                            _cim["LOC_MUNCA_TEXT"] = st.text_input("Detalii (dacă e fără loc fix)", value=_cim_get("LOC_MUNCA_TEXT", mapping.get("LOC_MUNCA_TEXT","")), key=f"cim_{emp_id}_LOC_MUNCA_TEXT")
+                        _cim["LOC_MUNCA_FARA_FIX"] = st.checkbox("Fără loc fix", value=bool(_cim_get("LOC_MUNCA_FARA_FIX", False)), key=f"cim_{emp_id}_LOC_MUNCA_FARA_FIX")
+                        _cim["LOC_MUNCA_TEXT"] = st.text_input("Detalii (dacă e fără loc fix)", value=_cim_get("LOC_MUNCA_TEXT", mapping.get("LOC_MUNCA_TEXT","")), key=f"cim_{emp_id}_LOC_MUNCA_TEXT")
 
-                        st.markdown("### D) Durata")
+                        st.markdown('<div class="emp-subsubsection-title">D) Durata</div>', unsafe_allow_html=True)
                         _cim["DURATA_TIP"] = st.selectbox("Tip", options=["Nedeterminată", "Determinată"], index=0 if _cim_get("DURATA_TIP","Nedeterminată")=="Nedeterminată" else 1, key=f"cim_{emp_id}_DURATA_TIP")
-                        cst, ced, cdl = st.columns(3)
-                        with cst:
-                            _cim["DATA_START_DET"] = st.text_input("Data start determinată (dd.mm.yyyy)", value=_cim_get("DATA_START_DET", mapping.get("DATA_START_DET","")), key=f"cim_{emp_id}_DATA_START_DET")
-                        with ced:
-                            _cim["DATA_END_DET"] = st.text_input("Data final determinată (dd.mm.yyyy)", value=_cim_get("DATA_END_DET", mapping.get("DATA_END_DET","")), key=f"cim_{emp_id}_DATA_END_DET")
-                        with cdl:
-                            _cim["DURATA_LUNI"] = st.text_input("Durata luni (opțional)", value=_cim_get("DURATA_LUNI", mapping.get("DURATA_LUNI","")), key=f"cim_{emp_id}_DURATA_LUNI")
+                        _cim["DATA_START_DET"] = st.text_input("Data start determinată (dd.mm.yyyy)", value=_cim_get("DATA_START_DET", mapping.get("DATA_START_DET","")), key=f"cim_{emp_id}_DATA_START_DET")
+                        _cim["DATA_END_DET"] = st.text_input("Data final determinată (dd.mm.yyyy)", value=_cim_get("DATA_END_DET", mapping.get("DATA_END_DET","")), key=f"cim_{emp_id}_DATA_END_DET")
+                        _cim["DURATA_LUNI"] = st.text_input("Durata luni (opțional)", value=_cim_get("DURATA_LUNI", mapping.get("DURATA_LUNI","")), key=f"cim_{emp_id}_DURATA_LUNI")
 
-                        st.markdown("### E) Program / timp de lucru")
-                        p1, p2, p3 = st.columns(3)
-                        with p1:
-                            _cim["ORE_ZI"] = st.text_input("Ore/zi", value=_cim_get("ORE_ZI", mapping.get("ORE_ZI","8")), key=f"cim_{emp_id}_ORE_ZI")
-                        with p2:
-                            _cim["ORE_SAPT"] = st.text_input("Ore/săptămână", value=_cim_get("ORE_SAPT", mapping.get("ORE_SAPT","40")), key=f"cim_{emp_id}_ORE_SAPT")
-                        with p3:
-                            _cim["TIP_TIMP_LUCRU"] = st.selectbox("Timp de lucru", options=["Normal", "Redus"], index=0 if _cim_get("TIP_TIMP_LUCRU","Normal")=="Normal" else 1, key=f"cim_{emp_id}_TIP_TIMP_LUCRU")
+                        st.markdown('<div class="emp-subsubsection-title">E) Program / timp de lucru</div>', unsafe_allow_html=True)
+                        _cim["ORE_ZI"] = st.text_input("Ore/zi", value=_cim_get("ORE_ZI", mapping.get("ORE_ZI","8")), key=f"cim_{emp_id}_ORE_ZI")
+                        _cim["ORE_SAPT"] = st.text_input("Ore/săptămână", value=_cim_get("ORE_SAPT", mapping.get("ORE_SAPT","40")), key=f"cim_{emp_id}_ORE_SAPT")
+                        _cim["TIP_TIMP_LUCRU"] = st.selectbox("Timp de lucru", options=["Normal", "Redus"], index=0 if _cim_get("TIP_TIMP_LUCRU","Normal")=="Normal" else 1, key=f"cim_{emp_id}_TIP_TIMP_LUCRU")
                         _cim["PROGRAM_REPARTIZARE"] = st.text_input("Repartizare program (ex: L–V 08:00–16:00)", value=_cim_get("PROGRAM_REPARTIZARE", mapping.get("PROGRAM_REPARTIZARE","")), key=f"cim_{emp_id}_PROGRAM_REPARTIZARE")
 
-                        st.markdown("### F) Perioada de probă")
+                        st.markdown('<div class="emp-subsubsection-title">F) Perioada de probă</div>', unsafe_allow_html=True)
                         _cim["PROBA_ZILE"] = st.text_input("Zile probă", value=_cim_get("PROBA_ZILE", mapping.get("PROBA_ZILE","")), key=f"cim_{emp_id}_PROBA_ZILE")
 
-                        st.markdown("### G) Salariu")
-                        s1, s2 = st.columns(2)
-                        with s1:
-                            _cim["SALARIU_BAZA"] = st.text_input("Salariu de bază brut", value=_cim_get("SALARIU_BAZA", mapping.get("SALARIU_BAZA","")), key=f"cim_{emp_id}_SALARIU_BAZA")
-                            _cim["SPORURI_TEXT"] = st.text_input("Sporuri (text)", value=_cim_get("SPORURI_TEXT", mapping.get("SPORURI_TEXT","")), key=f"cim_{emp_id}_SPORURI_TEXT")
-                        with s2:
-                            _cim["DATA_PLATA_SALARIU"] = st.text_input("Data plății (ex: 15)", value=_cim_get("DATA_PLATA_SALARIU", mapping.get("DATA_PLATA_SALARIU","")), key=f"cim_{emp_id}_DATA_PLATA_SALARIU")
-                            _cim["MODALITATE_PLATA"] = st.text_input("Modalitate plată", value=_cim_get("MODALITATE_PLATA", mapping.get("MODALITATE_PLATA","Virament bancar")), key=f"cim_{emp_id}_MODALITATE_PLATA")
+                        st.markdown('<div class="emp-subsubsection-title">G) Salariu</div>', unsafe_allow_html=True)
+                        _cim["SALARIU_BAZA"] = st.text_input("Salariu de bază brut", value=_cim_get("SALARIU_BAZA", mapping.get("SALARIU_BAZA","")), key=f"cim_{emp_id}_SALARIU_BAZA")
+                        _cim["SPORURI_TEXT"] = st.text_input("Sporuri (text)", value=_cim_get("SPORURI_TEXT", mapping.get("SPORURI_TEXT","")), key=f"cim_{emp_id}_SPORURI_TEXT")
+                        _cim["DATA_PLATA_SALARIU"] = st.text_input("Data plății (ex: 15)", value=_cim_get("DATA_PLATA_SALARIU", mapping.get("DATA_PLATA_SALARIU","")), key=f"cim_{emp_id}_DATA_PLATA_SALARIU")
+                        _cim["MODALITATE_PLATA"] = st.text_input("Modalitate plată", value=_cim_get("MODALITATE_PLATA", mapping.get("MODALITATE_PLATA","Virament bancar")), key=f"cim_{emp_id}_MODALITATE_PLATA")
 
-                        st.markdown("### H) Elemente specifice (clauze)")
-                        cl1, cl2 = st.columns(2)
-                        with cl1:
-                            _cim["CLAUZA_CONFIDENTIALITATE"] = st.text_area("Confidențialitate", value=_cim_get("CLAUZA_CONFIDENTIALITATE", mapping.get("CLAUZA_CONFIDENTIALITATE","")), key=f"cim_{emp_id}_CLAUZA_CONFIDENTIALITATE", height=100)
-                        with cl2:
-                            _cim["CLAUZA_NECONCURENTA"] = st.text_area("Neconcurență", value=_cim_get("CLAUZA_NECONCURENTA", mapping.get("CLAUZA_NECONCURENTA","")), key=f"cim_{emp_id}_CLAUZA_NECONCURENTA", height=100)
+                        st.markdown('<div class="emp-subsubsection-title">H) Elemente specifice (clauze)</div>', unsafe_allow_html=True)
+                        _cim["CLAUZA_CONFIDENTIALITATE"] = st.text_area("Confidențialitate", value=_cim_get("CLAUZA_CONFIDENTIALITATE", mapping.get("CLAUZA_CONFIDENTIALITATE","")), key=f"cim_{emp_id}_CLAUZA_CONFIDENTIALITATE", height=100)
+                        _cim["CLAUZA_NECONCURENTA"] = st.text_area("Neconcurență", value=_cim_get("CLAUZA_NECONCURENTA", mapping.get("CLAUZA_NECONCURENTA","")), key=f"cim_{emp_id}_CLAUZA_NECONCURENTA", height=100)
                         _cim["CLAUZE_SPECIALE"] = st.text_area("Alte clauze speciale", value=_cim_get("CLAUZE_SPECIALE", mapping.get("CLAUZE_SPECIALE","")), key=f"cim_{emp_id}_CLAUZE_SPECIALE", height=120)
 
-                    with st.expander("III. Acte necesare (checklist)", expanded=False):
-                        st.caption("Checklist intern – nu trebuie neapărat să apară în contract, dar ajută la Dosar / verificare.")
+                    st.markdown('<div class="emp-block-title">III. Acte necesare (checklist)</div>', unsafe_allow_html=True)
+                    if True:
                         _cim["ACT_OBS"] = st.text_area("Observații", value=_cim_get("ACT_OBS",""), key=f"cim_{emp_id}_ACT_OBS", height=80)
 
 
 
-                        st.markdown('### 📎 Acte necesare – checklist + import PDF pe fiecare rând')
+                        st.markdown('### 📎 Documente necesare (checklist și import PDF)')
                         st.caption('Bifele sunt interne (dosar/verificare). PDF-urile se salvează la angajat și pot fi descărcate/șterse.')
 
                         DOC_ROWS = [
@@ -9777,17 +10826,21 @@ def page_angajati(conn: sqlite3.Connection):
                         ]
 
                         for _dtype, _label in DOC_ROWS:
-                            c1, c2, c3, c4 = st.columns([3.2, 2.2, 2.2, 1.0])
-                            # Checkbox (stare internă)
-                            with c1:
-                                _key_chk = f'cim_{emp_id}_chk_{_dtype}'
-                                _checked = bool(_cim.get(f'ACT_{_dtype}', False))
-                                _checked = st.checkbox(_label, value=_checked, key=_key_chk)
-                                _cim[f'ACT_{_dtype}'] = _checked
+                            # Checkbox (stare internă) - rând 1
+                            _key_chk = f'cim_{emp_id}_chk_{_dtype}'
+                            _checked = bool(_cim.get(f'ACT_{_dtype}', False))
+                            _checked = st.checkbox(_label, value=_checked, key=_key_chk)
+                            _cim[f'ACT_{_dtype}'] = _checked
 
-                            # Upload PDF
-                            with c2:
-                                up = st.file_uploader('Import PDF', type=['pdf'], key=f'cim_{emp_id}_up_{_dtype}')
+                            # Upload/Acțiuni - rând 2 (sub checkbox), uploader mai compact
+                            c_up, c_dl, c_del = st.columns([2.0, 1.3, 0.7])
+                            with c_up:
+                                up = st.file_uploader(
+                                    "Import PDF",
+                                    type=['pdf'],
+                                    key=f'cim_{emp_id}_up_{_dtype}',
+                                    label_visibility="collapsed",
+                                )
                                 if up is not None:
                                     try:
                                         _bytes = up.getvalue()
@@ -9803,12 +10856,12 @@ def page_angajati(conn: sqlite3.Connection):
                             if _docs:
                                 _last = _docs[0]
                                 fn, mt, blob = _emp_doc_load(conn, _last['id'])
-                                with c3:
+                                with c_dl:
                                     if blob is not None:
                                         st.download_button('⬇️ Descarcă', data=blob, file_name=fn or f'{_dtype}.pdf', mime=mt or 'application/pdf', key=f'cim_{emp_id}_dl_{_dtype}')
                                     else:
                                         st.write('')
-                                with c4:
+                                with c_del:
                                     if st.button('🗑️', key=f'cim_{emp_id}_del_{_dtype}'):
                                         try:
                                             _emp_doc_delete(conn, _last['id'])
@@ -9817,8 +10870,8 @@ def page_angajati(conn: sqlite3.Connection):
                                         except Exception as e:
                                             st.error(f'Eroare la ștergere: {e}')
                             else:
-                                with c3: st.write('')
-                                with c4: st.write('')
+                                with c_dl: st.write('')
+                                with c_del: st.write('')
                             st.divider()
 
                     # Aplică valorile din formular peste mapping (au prioritate față de auto)
@@ -9833,14 +10886,11 @@ def page_angajati(conn: sqlite3.Connection):
                     # ---------------------------
 
                     st.divider()
-                    st.subheader('💾 Salvare CIM + Istoric contracte')
+                    st.subheader('💾 Gestionare versiuni contract')
                     cim_title = st.text_input('Titlu/observații versiune (opțional)', value=_cim.get('CIM_TITLE',''), key=f'cim_{emp_id}_CIM_TITLE')
                     _cim['CIM_TITLE'] = cim_title
-                    cbtn1, cbtn2 = st.columns([1, 2])
-                    with cbtn1:
-                        do_save_cim = st.button('💾 Salvează versiune CIM', key=f'cim_{emp_id}_save')
-                    with cbtn2:
-                        do_set_active_btn = st.button('⭐ Setează versiunea selectată ca activă', key=f'cim_{emp_id}_set_active')
+                    do_save_cim = st.button('💾 Salvează versiune CIM', key=f'cim_{emp_id}_save')
+                    do_set_active_btn = st.button('⭐ Setează versiunea selectată ca activă', key=f'cim_{emp_id}_set_active')
 
                     if do_save_cim:
                         try:
@@ -9855,7 +10905,8 @@ def page_angajati(conn: sqlite3.Connection):
                     # =========================================================
                     # Generare din cod (fără șabloane) – Contract CIM + Act adițional
                     # =========================================================
-                    with st.expander("⚡ Generează din cod (fără șablon) – Contract CIM & Act adițional", expanded=False):
+                    st.markdown('<div class="emp-block-title">IV. Generează Contract CIM & Act adițional</div>', unsafe_allow_html=True)
+                    if True:
                         cfg = load_config()
                         ang_den = (cfg.get("denumire_unitate") or "").strip()
                         ang_sediu = (cfg.get("adresa") or "").strip()
@@ -9866,12 +10917,10 @@ def page_angajati(conn: sqlite3.Connection):
                         # -----------------------------
                         # 1) Contract CIM (DOCX)
                         # -----------------------------
-                        st.markdown("### 📄 Contract individual de muncă (din cod)")
-                        cgen1, cgen2 = st.columns([1, 1])
-                        with cgen1:
-                            do_gen_cim_code = st.button("🧾 Generează CIM (DOCX + salvare istoric)", key=f"cim_code_gen_{emp_id}")
-                        with cgen2:
-                            do_gen_cim_code_pdf = st.button("📄 Generează și PDF", key=f"cim_code_gen_pdf_{emp_id}")
+                        st.markdown('<div class="emp-subsubsection-title">📄 Contract individual de muncă (din cod)</div>', unsafe_allow_html=True)
+                        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+                        do_gen_cim_code = st.button("🧾 Generează CIM (DOCX + salvare istoric)", key=f"cim_code_gen_{emp_id}")
+                        do_gen_cim_code_pdf = st.button("📄 Generează și PDF", key=f"cim_code_gen_pdf_{emp_id}")
 
                         if do_gen_cim_code or do_gen_cim_code_pdf:
                             try:
@@ -9991,15 +11040,12 @@ def page_angajati(conn: sqlite3.Connection):
                         # -----------------------------
                         # 2) Act adițional (DOCX)
                         # -----------------------------
-                        st.markdown("### 🧾 Act adițional la C.I.M. (din cod)")
-                        aa1, aa2 = st.columns(2)
-                        with aa1:
-                            aa_nr_code = st.text_input("Nr. act adițional", value="", key=f"aa_code_nr_{emp_id}")
-                            aa_data_code = st.text_input("Data act adițional", value="", key=f"aa_code_data_{emp_id}")
-                            aa_data_efect_code = st.text_input("Data efect (ex: 01.01.2026)", value="", key=f"aa_code_efect_{emp_id}")
-                        with aa2:
-                            revisal_nr = st.text_input("Nr. CIM în Revisal", value=str(_cim.get("CIM_NR","") or ""), key=f"aa_code_revisal_nr_{emp_id}")
-                            revisal_data = st.text_input("Data CIM în Revisal", value=str(_cim.get("CIM_DATA","") or ""), key=f"aa_code_revisal_data_{emp_id}")
+                        st.markdown('<div class="emp-subsubsection-title">🧾 Act adițional la C.I.M. (din cod)</div>', unsafe_allow_html=True)
+                        aa_nr_code = st.text_input("Nr. act adițional", value="", key=f"aa_code_nr_{emp_id}")
+                        aa_data_code = st.text_input("Data act adițional", value="", key=f"aa_code_data_{emp_id}")
+                        aa_data_efect_code = st.text_input("Data efect (ex: 01.01.2026)", value="", key=f"aa_code_efect_{emp_id}")
+                        revisal_nr = st.text_input("Nr. CIM în Revisal", value=str(_cim.get("CIM_NR","") or ""), key=f"aa_code_revisal_nr_{emp_id}")
+                        revisal_data = st.text_input("Data CIM în Revisal", value=str(_cim.get("CIM_DATA","") or ""), key=f"aa_code_revisal_data_{emp_id}")
                         aa_continut_code = st.text_area(
                             "Conținut modificări (scrii aici exact clauzele modificate)",
                             value="",
@@ -10007,11 +11053,8 @@ def page_angajati(conn: sqlite3.Connection):
                             key=f"aa_code_continut_{emp_id}",
                         )
 
-                        g1, g2 = st.columns([1, 1])
-                        with g1:
-                            do_gen_aa_code = st.button("🧾 Generează Act adițional (DOCX + salvare istoric)", key=f"aa_code_gen_{emp_id}")
-                        with g2:
-                            do_gen_aa_code_pdf = st.button("📄 Generează și PDF", key=f"aa_code_gen_pdf_{emp_id}")
+                        do_gen_aa_code = st.button("🧾 Generează Act adițional (DOCX + salvare istoric)", key=f"aa_code_gen_{emp_id}")
+                        do_gen_aa_code_pdf = st.button("📄 Generează și PDF", key=f"aa_code_gen_pdf_{emp_id}")
 
                         if do_gen_aa_code or do_gen_aa_code_pdf:
                             try:
@@ -10088,6 +11131,15 @@ def page_angajati(conn: sqlite3.Connection):
                 with tabs[4]:
                     st.subheader("🧾 Reges Online")
                     st.caption("Câmpuri pentru export/import REGES conform șablonului de modificare salariat.")
+                    _render_info_section(
+                        "Status curent REGES",
+                        [
+                            ("Grad invaliditate", _emp_v(emp, "reges_nume_grad_invaliditate")),
+                            ("Grad handicap", _emp_v(emp, "reges_nume_grad_handicap")),
+                            ("Tip handicap", _emp_v(emp, "reges_nume_tip_handicap")),
+                            ("Certificat", _emp_v(emp, "reges_nr_cert_handicap")),
+                        ],
+                    )
 
                     # Liste valori (din șablon)
                     grad_invaliditate_opts = [("Fara", "Fără"), ("Grad1", "Grad 1"), ("Grad2", "Grad 2"), ("Grad3", "Grad 3")]
@@ -10130,77 +11182,71 @@ def page_angajati(conn: sqlite3.Connection):
                     d_cert = _parse_date_any_ro(str(emp.get("reges_data_cert_handicap", "") or ""))
                     d_val = _parse_date_any_ro(str(emp.get("reges_termen_valabilitate", "") or ""))
 
-                    # UI
-                    c1, c2 = st.columns([1.2, 1.2])
-                    with c1:
-                        inv_sel = st.selectbox(
-                            "Grad invaliditate (COD)",
-                            options=[o[0] for o in grad_invaliditate_opts],
-                            index=max(0, [o[0] for o in grad_invaliditate_opts].index(cod_inv)) if cod_inv in [o[0] for o in grad_invaliditate_opts] else 0,
-                            key=f"reg_inv_{emp_id}",
-                        )
-                        inv_name = dict(grad_invaliditate_opts).get(inv_sel, "")
-                        st.text_input("Grad invaliditate (NUME)", value=inv_name, disabled=True, key=f"reg_inv_name_{emp_id}")
+                    # UI (vertical, aliniat stânga)
+                    inv_sel = st.selectbox(
+                        "Grad invaliditate (COD)",
+                        options=[o[0] for o in grad_invaliditate_opts],
+                        index=max(0, [o[0] for o in grad_invaliditate_opts].index(cod_inv)) if cod_inv in [o[0] for o in grad_invaliditate_opts] else 0,
+                        key=f"reg_inv_{emp_id}",
+                    )
+                    inv_name = dict(grad_invaliditate_opts).get(inv_sel, "")
+                    st.text_input("Grad invaliditate (NUME)", value=inv_name, disabled=True, key=f"reg_inv_name_{emp_id}")
 
-                        hand_sel = st.selectbox(
-                            "Grad handicap (COD)",
-                            options=[o[0] for o in grad_handicap_opts],
-                            index=max(0, [o[0] for o in grad_handicap_opts].index(cod_hand)) if cod_hand in [o[0] for o in grad_handicap_opts] else 0,
-                            key=f"reg_hand_{emp_id}",
-                        )
-                        hand_name = dict(grad_handicap_opts).get(hand_sel, "")
-                        st.text_input("Grad handicap (NUME)", value=hand_name, disabled=True, key=f"reg_hand_name_{emp_id}")
+                    hand_sel = st.selectbox(
+                        "Grad handicap (COD)",
+                        options=[o[0] for o in grad_handicap_opts],
+                        index=max(0, [o[0] for o in grad_handicap_opts].index(cod_hand)) if cod_hand in [o[0] for o in grad_handicap_opts] else 0,
+                        key=f"reg_hand_{emp_id}",
+                    )
+                    hand_name = dict(grad_handicap_opts).get(hand_sel, "")
+                    st.text_input("Grad handicap (NUME)", value=hand_name, disabled=True, key=f"reg_hand_name_{emp_id}")
 
-                    with c2:
-                        tip_sel = st.selectbox(
-                            "Tip handicap (COD)",
-                            options=[o[0] for o in tip_handicap_opts],
-                            index=max(0, [o[0] for o in tip_handicap_opts].index(cod_tip)) if cod_tip in [o[0] for o in tip_handicap_opts] else 0,
-                            key=f"reg_tip_{emp_id}",
-                        )
-                        tip_name = dict(tip_handicap_opts).get(tip_sel, "")
-                        st.text_input("Tip handicap (NUME)", value=tip_name, disabled=True, key=f"reg_tip_name_{emp_id}")
+                    tip_sel = st.selectbox(
+                        "Tip handicap (COD)",
+                        options=[o[0] for o in tip_handicap_opts],
+                        index=max(0, [o[0] for o in tip_handicap_opts].index(cod_tip)) if cod_tip in [o[0] for o in tip_handicap_opts] else 0,
+                        key=f"reg_tip_{emp_id}",
+                    )
+                    tip_name = dict(tip_handicap_opts).get(tip_sel, "")
+                    st.text_input("Tip handicap (NUME)", value=tip_name, disabled=True, key=f"reg_tip_name_{emp_id}")
 
-                        nr_cert_in = st.text_input("Număr certificat handicap", value=nr_cert, key=f"reg_nr_cert_{emp_id}")
-                        _today_reg = datetime.date.today()
-                        _min_reg = _today_reg.replace(year=_today_reg.year - 100)
-                        _max_reg = _today_reg.replace(year=_today_reg.year + 10)
-                        dc = st.date_input(
-                            "Data certificat handicap",
-                            value=d_cert or _today_reg,
-                            min_value=_min_reg,
-                            max_value=_max_reg,
-                            key=f"reg_d_cert_{emp_id}",
-                        )
-                        dv = st.date_input(
-                            "Termen de valabilitate",
-                            value=d_val or dc,
-                            min_value=_min_reg,
-                            max_value=_max_reg,
-                            key=f"reg_d_val_{emp_id}",
-                        )
+                    nr_cert_in = st.text_input("Număr certificat handicap", value=nr_cert, key=f"reg_nr_cert_{emp_id}")
+                    _today_reg = datetime.date.today()
+                    _min_reg = _today_reg.replace(year=_today_reg.year - 100)
+                    _max_reg = _today_reg.replace(year=_today_reg.year + 10)
+                    dc = st.date_input(
+                        "Data certificat handicap",
+                        value=d_cert or _today_reg,
+                        min_value=_min_reg,
+                        max_value=_max_reg,
+                        key=f"reg_d_cert_{emp_id}",
+                    )
+                    dv = st.date_input(
+                        "Termen de valabilitate",
+                        value=d_val or dc,
+                        min_value=_min_reg,
+                        max_value=_max_reg,
+                        key=f"reg_d_val_{emp_id}",
+                    )
 
-                    bs, bc = st.columns([1,1])
-                    with bs:
-                        if st.button("💾 Salvează Reges", key=f"reg_save_{emp_id}"):
-                            upd = dict(emp)
-                            upd.update({
-                                "reges_cod_grad_invaliditate": inv_sel,
-                                "reges_nume_grad_invaliditate": inv_name,
-                                "reges_cod_grad_handicap": hand_sel,
-                                "reges_nume_grad_handicap": hand_name,
-                                "reges_cod_tip_handicap": tip_sel,
-                                "reges_nume_tip_handicap": tip_name,
-                                "reges_nr_cert_handicap": str(nr_cert_in).strip(),
-                                "reges_data_cert_handicap": dc.isoformat(),
-                                "reges_termen_valabilitate": dv.isoformat(),
-                            })
-                            _employee_upsert(conn, upd, employee_id=emp_id)
-                            st.success("Salvat.")
-                            st.rerun()
-                    with bc:
-                        if st.button("↩️ Renunță", key=f"reg_cancel_{emp_id}"):
-                            st.rerun()
+                    if st.button("💾 Salvează Reges", key=f"reg_save_{emp_id}"):
+                        upd = dict(emp)
+                        upd.update({
+                            "reges_cod_grad_invaliditate": inv_sel,
+                            "reges_nume_grad_invaliditate": inv_name,
+                            "reges_cod_grad_handicap": hand_sel,
+                            "reges_nume_grad_handicap": hand_name,
+                            "reges_cod_tip_handicap": tip_sel,
+                            "reges_nume_tip_handicap": tip_name,
+                            "reges_nr_cert_handicap": str(nr_cert_in).strip(),
+                            "reges_data_cert_handicap": dc.isoformat(),
+                            "reges_termen_valabilitate": dv.isoformat(),
+                        })
+                        _employee_upsert(conn, upd, employee_id=emp_id)
+                        st.success("Salvat.")
+                        st.rerun()
+                    if st.button("↩️ Renunță", key=f"reg_cancel_{emp_id}"):
+                        st.rerun()
 
 
                 # ---------------------------
@@ -10212,24 +11258,58 @@ def page_angajati(conn: sqlite3.Connection):
                 with tabs[5]:
                     st.subheader("🧩 COD COR")
                     st.caption("Gestionare tabel COR + aplicare cod COR pe angajat (completează automat denumirea funcției).")
+                    _render_info_section(
+                        "Situație curentă COR",
+                        [
+                            ("Cod COR", _emp_v(emp, "cod_cor")),
+                            ("Funcție (din angajat)", _emp_v(emp, "functie")),
+                        ],
+                    )
 
                     q = st.text_input("Caută în tabel (cod sau denumire)", value="", key=f"cor_q_{emp_id}")
                     rows = _cor_list(conn, q=q, limit=1000)
+                    cor_selected_code_key = f"cor_selected_code_{emp_id}"
 
                     if rows:
                         df_cor = pd.DataFrame(rows, columns=["COD COR", "DENUMIRE OCUPAȚIE"])
-                        st.dataframe(df_cor, use_container_width=True, height=320)
+                        selected_code = str(st.session_state.get(cor_selected_code_key, "") or "").strip()
+                        if not selected_code:
+                            selected_code = str(emp.get("cod_cor") or "").strip()
+
+                        df_cor_edit = df_cor.copy()
+                        df_cor_edit.insert(0, "Select", df_cor_edit["COD COR"].astype(str) == selected_code)
+                        edited_cor = st.data_editor(
+                            df_cor_edit,
+                            column_config={
+                                "Select": st.column_config.CheckboxColumn("Selectat", help="Bifează pentru a prelua în «Alege din tabel»."),
+                                "COD COR": st.column_config.TextColumn("COD COR", disabled=True),
+                                "DENUMIRE OCUPAȚIE": st.column_config.TextColumn("DENUMIRE OCUPAȚIE", disabled=True),
+                            },
+                            disabled=["COD COR", "DENUMIRE OCUPAȚIE"],
+                            key=f"cor_table_editor_{emp_id}",
+                            use_container_width=True,
+                            height=320,
+                        )
+                        selected_rows = edited_cor[edited_cor["Select"]]
+                        if not selected_rows.empty:
+                            selected_from_table = str(selected_rows.iloc[0]["COD COR"]).strip()
+                            if st.session_state.get(cor_selected_code_key) != selected_from_table:
+                                st.session_state[cor_selected_code_key] = selected_from_table
+                                st.rerun()
                     else:
                         st.info("Nu există încă înregistrări în tabelul COR (sau nu s-a găsit nimic pentru filtrul curent).")
 
+                    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
                     st.markdown("### Aplică pentru angajat")
                     current_cod = str(emp.get("cod_cor") or "").strip()
+                    selected_code = str(st.session_state.get(cor_selected_code_key, "") or "").strip()
+                    selected_code = selected_code or current_cod
 
                     opt = [""] + [f"{c} — {d}" for (c, d) in rows]
                     default_idx = 0
-                    if current_cod:
+                    if selected_code:
                         for i, s in enumerate(opt):
-                            if s.startswith(current_cod):
+                            if s.startswith(selected_code):
                                 default_idx = i
                                 break
 
@@ -10237,47 +11317,40 @@ def page_angajati(conn: sqlite3.Connection):
                     sel_cod = sel.split("—")[0].strip() if sel else ""
                     sel_den = _cor_get(conn, sel_cod) if sel_cod else ""
 
-                    c1, c2 = st.columns([1, 2])
-                    with c1:
-                        cod_in = st.text_input("Cod COR", value=sel_cod or current_cod, key=f"cor_cod_in_{emp_id}")
-                    with c2:
-                        den_in = st.text_input(
-                            "Denumire ocupație",
-                            value=sel_den or (_cor_get(conn, current_cod) or ""),
-                            key=f"cor_den_in_{emp_id}",
-                        )
+                    cod_in = st.text_input("Cod COR", value=sel_cod or current_cod, key=f"cor_cod_in_{emp_id}")
+                    den_in = st.text_input(
+                        "Denumire ocupație",
+                        value=sel_den or (_cor_get(conn, current_cod) or ""),
+                        key=f"cor_den_in_{emp_id}",
+                    )
 
-                    b1, b2, b3 = st.columns([1, 1, 1])
-                    with b1:
-                        if st.button("💾 Salvează în tabel COR", key=f"cor_save_tbl_{emp_id}"):
-                            if str(cod_in).strip() and str(den_in).strip():
-                                _cor_upsert(conn, str(cod_in).strip(), str(den_in).strip())
-                                st.success("Salvat în tabelul COR.")
-                                st.rerun()
-                            else:
-                                st.error("Completează atât Cod COR cât și Denumire ocupație.")
-
-                    with b2:
-                        if st.button("✅ Aplică la angajat", key=f"cor_apply_emp_{emp_id}"):
-                            cod_apply = str(cod_in).strip()
-                            den_apply = str(den_in).strip() if str(den_in).strip() else (_cor_get(conn, cod_apply) or "")
-                            upd = dict(emp)
-                            upd.update({"cod_cor": cod_apply})
-                            if den_apply:
-                                upd["functie"] = den_apply
-                            _employee_upsert(conn, upd, employee_id=emp_id)
-                            st.success("Aplicat pe angajat.")
+                    if st.button("💾 Salvează în tabel COR", key=f"cor_save_tbl_{emp_id}"):
+                        if str(cod_in).strip() and str(den_in).strip():
+                            _cor_upsert(conn, str(cod_in).strip(), str(den_in).strip())
+                            st.success("Salvat în tabelul COR.")
                             st.rerun()
+                        else:
+                            st.error("Completează atât Cod COR cât și Denumire ocupație.")
 
-                    with b3:
-                        if st.button("🗑 Dezactivează cod din tabel", key=f"cor_del_tbl_{emp_id}"):
-                            cod_del = str(cod_in).strip()
-                            if cod_del:
-                                _cor_soft_delete(conn, cod_del)
-                                st.success("Cod dezactivat (soft delete) din tabelul COR.")
-                                st.rerun()
-                            else:
-                                st.error("Completează Cod COR pentru ștergere.")
+                    if st.button("✅ Aplică la angajat", key=f"cor_apply_emp_{emp_id}"):
+                        cod_apply = str(cod_in).strip()
+                        den_apply = str(den_in).strip() if str(den_in).strip() else (_cor_get(conn, cod_apply) or "")
+                        upd = dict(emp)
+                        upd.update({"cod_cor": cod_apply})
+                        if den_apply:
+                            upd["functie"] = den_apply
+                        _employee_upsert(conn, upd, employee_id=emp_id)
+                        st.success("Aplicat pe angajat.")
+                        st.rerun()
+
+                    if st.button("🗑 Dezactivează cod din tabel", key=f"cor_del_tbl_{emp_id}"):
+                        cod_del = str(cod_in).strip()
+                        if cod_del:
+                            _cor_soft_delete(conn, cod_del)
+                            st.success("Cod dezactivat (soft delete) din tabelul COR.")
+                            st.rerun()
+                        else:
+                            st.error("Completează Cod COR pentru ștergere.")
 
 
                 # ---------------------------
@@ -10286,24 +11359,59 @@ def page_angajati(conn: sqlite3.Connection):
                 with tabs[6]:
                     st.subheader("📜 Funcția angajatului (conform Legii 153/2017)")
                     st.caption("Selectează funcția din nomenclator și aplic-o angajatului. Denumirea se completează automat.")
+                    _render_info_section(
+                        "Situație curentă Legea 153",
+                        [
+                            ("Cod 153", _emp_v(emp, "cod_153")),
+                            ("Denumire funcție", _emp_v(emp, "den_153")),
+                            ("Marcă", _emp_v(emp, "marca")),
+                        ],
+                    )
 
                     q153 = st.text_input("Introdu codul sau denumirea funcției", value="", key=f"l153_q_{emp_id}")
                     rows153 = _l153_list(conn, q=q153, limit=1000)
+                    l153_selected_code_key = f"l153_selected_code_{emp_id}"
 
                     if rows153:
                         df_153 = pd.DataFrame(rows153, columns=["COD 153", "DENUMIRE FUNCȚIE (153)"])
-                        st.dataframe(df_153, use_container_width=True, height=320)
+                        selected_code_153 = str(st.session_state.get(l153_selected_code_key, "") or "").strip()
+                        if not selected_code_153:
+                            selected_code_153 = str(emp.get("cod_153") or "").strip()
+
+                        df_153_edit = df_153.copy()
+                        df_153_edit.insert(0, "Select", df_153_edit["COD 153"].astype(str) == selected_code_153)
+                        edited_153 = st.data_editor(
+                            df_153_edit,
+                            column_config={
+                                "Select": st.column_config.CheckboxColumn("Selectat", help="Bifează pentru a prelua în «Alege din tabel»."),
+                                "COD 153": st.column_config.TextColumn("COD 153", disabled=True),
+                                "DENUMIRE FUNCȚIE (153)": st.column_config.TextColumn("DENUMIRE FUNCȚIE (153)", disabled=True),
+                            },
+                            disabled=["COD 153", "DENUMIRE FUNCȚIE (153)"],
+                            key=f"l153_table_editor_{emp_id}",
+                            use_container_width=True,
+                            height=320,
+                        )
+                        selected_rows_153 = edited_153[edited_153["Select"]]
+                        if not selected_rows_153.empty:
+                            selected_from_table_153 = str(selected_rows_153.iloc[0]["COD 153"]).strip()
+                            if st.session_state.get(l153_selected_code_key) != selected_from_table_153:
+                                st.session_state[l153_selected_code_key] = selected_from_table_153
+                                st.rerun()
                     else:
                         st.info("Nu există încă înregistrări în tabelul Legea 153 (sau nu s-a găsit nimic pentru filtrul curent).")
 
+                    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
                     st.markdown("### Aplică pentru angajat")
                     cur_cod_153 = str(emp.get("cod_153") or "").strip()
+                    selected_code_153 = str(st.session_state.get(l153_selected_code_key, "") or "").strip()
+                    selected_code_153 = selected_code_153 or cur_cod_153
 
                     opt153 = [""] + [f"{c} — {d}" for (c, d) in rows153]
                     default153 = 0
-                    if cur_cod_153:
+                    if selected_code_153:
                         for i, s in enumerate(opt153):
-                            if s.startswith(cur_cod_153):
+                            if s.startswith(selected_code_153):
                                 default153 = i
                                 break
 
@@ -10327,40 +11435,33 @@ def page_angajati(conn: sqlite3.Connection):
                         st.session_state[cod_key] = sel153_cod
                         st.session_state[den_key] = (sel153_den or _l153_get(conn, sel153_cod) or "").strip()
 
-                    c1, c2 = st.columns([1, 2])
-                    with c1:
-                        cod153_in = st.text_input("Cod 153", key=cod_key)
-                    with c2:
-                        den153_in = st.text_input("Denumire funcție (153)", key=den_key)
-                    b1, b2, b3 = st.columns([1, 1, 1])
-                    with b1:
-                        if st.button("💾 Salvează în tabel 153", key=f"l153_save_tbl_{emp_id}"):
-                            if str(cod153_in).strip() and str(den153_in).strip():
-                                _l153_upsert(conn, str(cod153_in).strip(), str(den153_in).strip())
-                                st.success("Salvat în tabelul Legea 153.")
-                                st.rerun()
-                            else:
-                                st.error("Completează atât Cod 153 cât și Denumire.")
-
-                    with b2:
-                        if st.button("✅ Aplică la angajat", key=f"l153_apply_emp_{emp_id}"):
-                            cod_apply = str(cod153_in).strip()
-                            den_apply = str(den153_in).strip() if str(den153_in).strip() else (_l153_get(conn, cod_apply) or "")
-                            upd = dict(emp)
-                            upd.update({"cod_153": cod_apply, "den_153": den_apply})
-                            _employee_upsert(conn, upd, employee_id=emp_id)
-                            st.success("Aplicat pe angajat.")
+                    cod153_in = st.text_input("Cod 153", key=cod_key)
+                    den153_in = st.text_input("Denumire funcție (153)", key=den_key)
+                    if st.button("💾 Salvează în tabel 153", key=f"l153_save_tbl_{emp_id}"):
+                        if str(cod153_in).strip() and str(den153_in).strip():
+                            _l153_upsert(conn, str(cod153_in).strip(), str(den153_in).strip())
+                            st.success("Salvat în tabelul Legea 153.")
                             st.rerun()
+                        else:
+                            st.error("Completează atât Cod 153 cât și Denumire.")
 
-                    with b3:
-                        if st.button("🗑 Dezactivează cod din tabel", key=f"l153_del_tbl_{emp_id}"):
-                            cod_del = str(cod153_in).strip()
-                            if cod_del:
-                                _l153_soft_delete(conn, cod_del)
-                                st.success("Cod dezactivat (soft delete) din tabelul Legea 153.")
-                                st.rerun()
-                            else:
-                                st.error("Completează Cod 153 pentru ștergere.")
+                    if st.button("✅ Aplică la angajat", key=f"l153_apply_emp_{emp_id}"):
+                        cod_apply = str(cod153_in).strip()
+                        den_apply = str(den153_in).strip() if str(den153_in).strip() else (_l153_get(conn, cod_apply) or "")
+                        upd = dict(emp)
+                        upd.update({"cod_153": cod_apply, "den_153": den_apply})
+                        _employee_upsert(conn, upd, employee_id=emp_id)
+                        st.success("Aplicat pe angajat.")
+                        st.rerun()
+
+                    if st.button("🗑 Dezactivează cod din tabel", key=f"l153_del_tbl_{emp_id}"):
+                        cod_del = str(cod153_in).strip()
+                        if cod_del:
+                            _l153_soft_delete(conn, cod_del)
+                            st.success("Cod dezactivat (soft delete) din tabelul Legea 153.")
+                            st.rerun()
+                        else:
+                            st.error("Completează Cod 153 pentru ștergere.")
 
                     st.divider()
                     st.subheader("💰 L153/2017 – grilă salarizare (din nomenclator)")
@@ -10387,10 +11488,8 @@ def page_angajati(conn: sqlite3.Connection):
 
                         KGRID = f"l153_grid_{emp_id}_"
 
-                        c1, c2, c3 = st.columns([1, 1, 1])
-
                         anexas = sorted(df_grid["Anexa"].dropna().astype(str).unique().tolist())
-                        anexa_sel = c1.selectbox(
+                        anexa_sel = st.selectbox(
                             "Anexa",
                             anexas,
                             index=_pick_default(anexas, str(active.get("anexa","")).strip()) if anexas else 0,
@@ -10399,7 +11498,7 @@ def page_angajati(conn: sqlite3.Connection):
 
                         df1 = df_grid[df_grid["Anexa"].astype(str).str.strip() == str(anexa_sel).strip()] if anexa_sel else df_grid
                         tabels = sorted(df1["Tabel"].dropna().astype(str).unique().tolist())
-                        tabel_sel = c2.selectbox(
+                        tabel_sel = st.selectbox(
                             "Tabel",
                             tabels,
                             index=_pick_default(tabels, str(active.get("tabel","")).strip()) if tabels else 0,
@@ -10408,7 +11507,7 @@ def page_angajati(conn: sqlite3.Connection):
 
                         df2 = df1[df1["Tabel"].astype(str).str.strip() == str(tabel_sel).strip()] if tabel_sel else df1
                         functii = sorted(df2["Funcție"].dropna().astype(str).unique().tolist())
-                        functie_sel = c3.selectbox(
+                        functie_sel = st.selectbox(
                             "Funcție",
                             functii,
                             index=_pick_default(functii, str(active.get("functie","")).strip()) if functii else 0,
@@ -10443,39 +11542,34 @@ def page_angajati(conn: sqlite3.Connection):
                                 st.session_state[key] = cur
                             return st.selectbox(label, options, index=options.index(cur), key=key)
 
-                        s_col, g_col, t_col = st.columns([1, 1, 1])
-
                         # 1) STUDII
                         studii_opts = _clean_opts(df3.get("Studii"))
-                        with s_col:
-                            studii_sel = _safe_sb(
-                                "Studii (dacă se aplică)",
-                                studii_opts,
-                                key=f"{KGRID}studii",
-                                preferred=active.get("studii", ""),
-                            )
+                        studii_sel = _safe_sb(
+                            "Studii (dacă se aplică)",
+                            studii_opts,
+                            key=f"{KGRID}studii",
+                            preferred=active.get("studii", ""),
+                        )
                         df4 = df3[df3["Studii"].astype(str).str.strip() == str(studii_sel).strip()] if studii_sel else df3
 
                         # 2) GRAD
                         grad_opts = _clean_opts(df4.get("Grad"))
-                        with g_col:
-                            grad_sel = _safe_sb(
-                                "Grad (dacă se aplică)",
-                                grad_opts,
-                                key=f"{KGRID}grad",
-                                preferred=active.get("grad", ""),
-                            )
+                        grad_sel = _safe_sb(
+                            "Grad (dacă se aplică)",
+                            grad_opts,
+                            key=f"{KGRID}grad",
+                            preferred=active.get("grad", ""),
+                        )
                         df5 = df4[df4["Grad"].astype(str).str.strip() == str(grad_sel).strip()] if grad_sel else df4
 
                         # 3) TREAPTĂ / GRADAȚIE
                         treapta_opts = _clean_opts(df5.get("Treaptă/Gradație"))
-                        with t_col:
-                            treapta_sel = _safe_sb(
-                                "Treaptă/Gradație (dacă se aplică)",
-                                treapta_opts,
-                                key=f"{KGRID}treapta",
-                                preferred=active.get("treapta", ""),
-                            )
+                        treapta_sel = _safe_sb(
+                            "Treaptă/Gradație (dacă se aplică)",
+                            treapta_opts,
+                            key=f"{KGRID}treapta",
+                            preferred=active.get("treapta", ""),
+                        )
                         df6 = df5[df5["Treaptă/Gradație"].astype(str).str.strip() == str(treapta_sel).strip()] if treapta_sel else df5
 
                         # Rezultat final: dacă avem mai multe rânduri, luăm primul (de regulă e unic)
@@ -10484,11 +11578,8 @@ def page_angajati(conn: sqlite3.Connection):
                         s_val = row.get("Salariu", "")
                         c_val = row.get("Coeficient", "")
 
-                        b1, b2 = st.columns([1, 1])
-                        with b1:
-                            st.text_input("Salariu (auto)", value=str(s_val), key=f"{KGRID}sal", disabled=True)
-                        with b2:
-                            st.text_input("Coeficient (auto)", value=str(c_val), key=f"{KGRID}coef", disabled=True)
+                        st.text_input("Salariu (auto)", value=str(s_val), key=f"{KGRID}sal", disabled=True)
+                        st.text_input("Coeficient (auto)", value=str(c_val), key=f"{KGRID}coef", disabled=True)
 
                         _today_l153 = datetime.date.today()
                         _min_l153 = _today_l153.replace(year=_today_l153.year - 100)
@@ -10535,12 +11626,10 @@ def page_angajati(conn: sqlite3.Connection):
                             st.info("Nu există încă înregistrări L153 pentru acest angajat.")
 
                 with tabs[8]:
-                    st.warning("Ștergerea este soft delete (activ=0).")
-                    confirm = st.checkbox("Confirm ștergerea", key=f"ang_del_confirm_{emp_id}")
-                    c_del, c_cancel = st.columns([1, 1])
-                    with c_del:
+                    with st.container(key="ang_delete_panel"):
+                        st.warning("Această acțiune dezactivează angajatul (soft delete: activ=0).")
+                        confirm = st.checkbox("Confirm dezactivarea", key=f"ang_del_confirm_{emp_id}")
                         do_del = st.button("🗑 Dezactivează angajat", disabled=not confirm, key=f"ang_del_btn_{emp_id}")
-                    with c_cancel:
                         cancel = st.button("↩ Renunță", key=f"ang_del_cancel_{emp_id}")
 
                     if cancel:
