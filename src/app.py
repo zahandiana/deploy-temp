@@ -3777,19 +3777,51 @@ def render_org_cytoscape_collapsible(
 
     # template HTML (FĂRĂ f-string!)
     html = r"""
-<div id="__CY_ID__" style="width:100%; height:__CY_H__px; border:1px solid #e2e2e2; border-radius:10px;"></div>
+<style>
+  #__CY_ID__{
+    width:100%;
+    height:__CY_H__px;
+    border:1px solid rgba(148,163,184,.24);
+    border-radius:12px;
+    background: rgba(2,6,23,0.42);
+  }
+  #__CY_ACTIONS__{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  #__CY_ACTIONS__ button{
+    padding:0 14px;
+    min-height:38px;
+    height:38px;
+    border-radius:11px;
+    border:1px solid rgba(148,163,184,.34);
+    background: rgba(15,23,42,.72);
+    color: rgba(241,245,249,.96);
+    font-weight:700;
+    cursor:pointer;
+    transition: border-color .18s ease, background .18s ease, transform .12s ease;
+  }
+  #__CY_ACTIONS__ button:hover{
+    border-color: rgba(56,189,248,.62);
+    background: rgba(30,41,59,.9);
+    transform: translateY(-1px);
+  }
+</style>
+<div id="__CY_ID__"></div>
 
-<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-  <button id="__BTN_FIT__" style="padding:6px 10px;">Fit</button>
-  <button id="__BTN_EXPAND__" style="padding:6px 10px;">Expand all</button>
-  <button id="__BTN_COLLAPSE__" style="padding:6px 10px;">Collapse all</button>
+<div id="__CY_ACTIONS__">
+  <button id="__BTN_FIT__">Fit</button>
+  <button id="__BTN_EXPAND__">Expand all</button>
+  <button id="__BTN_COLLAPSE__">Collapse all</button>
 
-  <button id="__BTN_SAVE__" style="padding:6px 10px; display:__SAVE_DISPLAY__;">Salvează aranjarea</button>
-  <button id="__BTN_RESET__" style="padding:6px 10px; display:__SAVE_DISPLAY__;">Resetează aranjarea</button>
+  <button id="__BTN_SAVE__" style="display:__SAVE_DISPLAY__;">Salvează aranjarea</button>
+  <button id="__BTN_RESET__" style="display:__SAVE_DISPLAY__;">Resetează aranjarea</button>
 
-  <button id="__BTN_PNG__" style="padding:6px 10px;">Export PNG</button>
-  <button id="__BTN_JPG__" style="padding:6px 10px;">Export JPEG</button>
-  <button id="__BTN_PDF__" style="padding:6px 10px;">Export PDF</button>
+  <button id="__BTN_PNG__">Export PNG</button>
+  <button id="__BTN_JPG__">Export JPEG</button>
+  <button id="__BTN_PDF__">Export PDF</button>
 </div>
 
 <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
@@ -9270,6 +9302,33 @@ def page_angajati(conn: sqlite3.Connection):
           height: 40px !important;
           margin-left: 0 !important;
           margin-right: auto !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stFileUploaderDropzone"]{
+          background: rgba(15,23,42,0.56) !important;
+          border: 1px dashed rgba(148,163,184,0.34) !important;
+          border-radius: 10px !important;
+          color: rgba(226,232,240,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stFileUploaderDropzone"]:hover{
+          border-color: rgba(56,189,248,0.58) !important;
+          background: rgba(30,41,59,0.70) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stFileUploaderDropzone"] *{
+          color: rgba(226,232,240,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stFileUploaderDropzone"] svg{
+          color: rgba(148,163,184,0.96) !important;
+          fill: rgba(148,163,184,0.96) !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stBaseButton-secondary"]{
+          background: rgba(30,41,59,0.92) !important;
+          color: rgba(241,245,249,0.96) !important;
+          border: 1px solid rgba(148,163,184,0.34) !important;
+          border-radius: 9px !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-cim_"][class*="_up_"] [data-testid="stBaseButton-secondary"]:hover{
+          background: rgba(51,65,85,0.96) !important;
+          border-color: rgba(56,189,248,0.58) !important;
         }
         .st-key-emp_subtabs_box [class*="st-key-reg_"]{
           max-width: 50% !important;
@@ -15713,81 +15772,216 @@ def page_organigrama(conn):
         st.markdown(
             """
             <style>
-            section.main:has(#org-scope) .org-page .org-title{
+            .org-page .org-title{
               margin: 0 0 0.5rem 0 !important;
               padding: 0 !important;
             }
-            section.main:has(#org-scope) .org-page .org-toolbar,
-            section.main:has(#org-scope) .org-page .org-filters,
-            section.main:has(#org-scope) .org-page .org-canvas,
-            section.main:has(#org-scope) .org-page .org-bottom{
+            .org-page .org-toolbar,
+            .org-page .org-filters,
+            .org-page .org-canvas,
+            .org-page .org-bottom,
+            .org-page .org-export{
               border: 1px solid rgba(148,163,184,0.22);
-              border-radius: 8px;
-              background: rgba(15,23,42,0.18);
-              padding: 12px 14px;
+              border-radius: 12px;
+              background: rgba(15,23,42,0.20);
+              padding: 14px 16px;
               margin: 0 0 12px 0;
               text-align: left;
             }
-            section.main:has(#org-scope) .org-page .org-filters{
+            .org-page .org-filters{
               margin-bottom: 18px;
             }
-            section.main:has(#org-scope) .org-page .org-toolbar{
-              max-width: 220px;
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-            }
-            section.main:has(#org-scope) .org-page .org-bottom{ max-width: 560px; }
-            section.main:has(#org-scope) .org-page .org-section-title{
+            .org-page .org-bottom{ max-width: 560px; }
+            .org-page .org-export{ max-width: 760px; }
+            .org-page .org-section-title{
               margin: 0 0 6px 0;
               font-size: 1.18rem;
               font-weight: 900;
               color: rgba(248,250,252,0.96);
               letter-spacing: 0.01em;
             }
-            section.main:has(#org-scope) .org-page .org-section-desc{
-              margin: 0;
+            .org-page .org-subheading{
+              margin: 10px 0 6px 0 !important;
+              font-size: 1.14rem !important;
+              font-weight: 900 !important;
+              color: rgba(248,250,252,0.98) !important;
+              letter-spacing: 0.01em;
+              position: relative;
+              padding-bottom: 8px !important;
+            }
+            .org-page .org-subheading::after{
+              content: "";
+              display: block;
+              width: min(50vw, 420px);
+              max-width: 100%;
+              height: 1px;
+              margin-top: 7px;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.24) 55%,
+                rgba(148,163,184,0.02) 100%
+              );
+            }
+            .org-page .org-section-desc{
+              margin: 4px 0 12px 0;
               max-width: 860px;
               color: rgba(203,213,225,0.90);
               font-size: 0.94rem;
               line-height: 1.45;
             }
-            section.main:has(#org-scope) .org-page .org-view-radio{
+            .org-page .org-view-radio{
               margin-top: 12px;
             }
-            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] [role="radiogroup"]{
+            .org-page .org-controls-grid{
+              display: grid;
+              grid-template-columns: 1fr;
+              gap: 14px;
+              margin-top: 14px;
+            }
+            .org-page .org-control-block{
+              border: 1px solid rgba(148,163,184,0.18);
+              border-radius: 10px;
+              background: rgba(2,6,23,0.22);
+              padding: 10px 12px;
+            }
+            .org-page .org-control-block-settings{
+              width: 58%;
+              min-width: 340px;
+              max-width: min(60vw, 760px);
+            }
+            .org-page .org-control-block-interactive{
+              width: 58%;
+              min-width: 340px;
+              max-width: min(60vw, 760px);
+            }
+            .org-page .org-control-block .org-subtitle{
+              font-size: 0.98rem;
+              font-weight: 800;
+              color: rgba(241,245,249,0.96);
+              margin: 0 0 6px 0;
+            }
+            .org-page .org-control-block .org-subdesc{
+              margin: 0 0 8px 0;
+              color: rgba(148,163,184,0.94);
+              font-size: 0.86rem;
+              line-height: 1.35;
+            }
+            .org-page .org-control-block [data-testid="stSlider"],
+            .org-page .org-control-block [data-testid="stCheckbox"],
+            .org-page .org-control-block [data-testid="stColorPicker"]{
+              margin-top: 8px !important;
+              margin-bottom: 10px !important;
+            }
+            .st-key-org_ctrl_settings,
+            .st-key-org_ctrl_interactive{
+              width: 58% !important;
+              min-width: 340px !important;
+              max-width: min(60vw, 760px) !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-org_ctrl_settings [data-testid="stSlider"],
+            .st-key-org_ctrl_interactive [data-testid="stCheckbox"],
+            .st-key-org_ctrl_interactive [data-testid="stColorPicker"]{
+              margin-top: 8px !important;
+              margin-bottom: 10px !important;
+            }
+            .st-key-org_ctrl_interactive [data-testid="stCheckbox"]{
+              padding: 6px 8px;
+              border: 1px solid rgba(148,163,184,0.20);
+              border-radius: 9px;
+              background: rgba(15,23,42,0.30);
+            }
+            .st-key-org_ctrl_interactive [data-testid="stCheckbox"] > label{
+              display: flex !important;
+              align-items: center !important;
+              gap: 8px !important;
+            }
+            .st-key-org_ctrl_interactive [data-testid="stCheckbox"] p{
+              margin: 0 !important;
+              font-weight: 600 !important;
+              color: rgba(226,232,240,0.96) !important;
+              line-height: 1.35 !important;
+            }
+            .org-page .org-view-radio div[data-testid="stRadio"] [role="radiogroup"]{
               gap: 12px !important;
             }
-            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] label p,
-            section.main:has(#org-scope) .org-page .org-view-radio div[data-testid="stRadio"] label span{
+            .org-page .org-view-radio div[data-testid="stRadio"] label p,
+            .org-page .org-view-radio div[data-testid="stRadio"] label span{
               font-weight: 800 !important;
               color: rgba(248,250,252,0.96) !important;
             }
-            section.main:has(#org-scope) .org-page div[data-testid="stTabs"] > div[role="tablist"]{
-              display: flex !important;
-              flex-direction: column !important;
-              align-items: flex-start !important;
-              gap: 10px !important;
-              max-width: 220px !important;
+            .org-page .org-section-title,
+            .org-page h3,
+            .org-page h4{
+              position: relative;
+              font-weight: 800 !important;
+              color: rgba(241,245,249,0.98) !important;
+              letter-spacing: 0.01em;
+              padding-bottom: 8px !important;
               margin-bottom: 12px !important;
             }
-            section.main:has(#org-scope) .org-page div[data-testid="stTabs"] > div[role="tablist"] button[role="tab"]{
-              width: 220px !important;
-              min-width: 220px !important;
-              max-width: 220px !important;
-              height: 42px !important;
-              min-height: 42px !important;
-              max-height: 42px !important;
-              border-radius: 12px !important;
-              justify-content: flex-start !important;
-              text-align: left !important;
-              font-weight: 700 !important;
+            .org-page .org-section-title::after,
+            .org-page h3::after,
+            .org-page h4::after{
+              content: "";
+              display: block;
+              width: min(50vw, 420px);
+              max-width: 100%;
+              height: 1px;
+              margin-top: 7px;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.24) 55%,
+                rgba(148,163,184,0.02) 100%
+              );
             }
-            section.main:has(#org-scope) .org-page .org-selected-row{
+            .st-key-org_main_tabs_box div[data-testid="stTabs"] > div[role="tablist"]{
+              display: flex !important;
+              gap: 0 !important;
+              margin: 6px 0 14px 0 !important;
+              padding: 0 !important;
+              border-bottom: 1px solid rgba(148,163,184,0.28) !important;
+              overflow-x: auto !important;
+              overflow-y: hidden !important;
+              flex-wrap: nowrap !important;
+            }
+            .st-key-org_main_tabs_box div[data-testid="stTabs"] button[role="tab"]{
+              min-height: 38px !important;
+              height: 38px !important;
+              padding: 0 14px !important;
+              border: none !important;
+              border-radius: 0 !important;
+              border-bottom: 2px solid transparent !important;
+              background: transparent !important;
+              color: rgba(226,232,240,0.88) !important;
+              font-size: 0.94rem !important;
+              font-weight: 700 !important;
+              margin: 0 !important;
+              transition: color .18s ease, border-color .18s ease !important;
+              white-space: nowrap !important;
+            }
+            .st-key-org_main_tabs_box div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+              background: transparent !important;
+              color: #ffffff !important;
+              border-bottom-color: rgba(56,189,248,0.92) !important;
+              box-shadow: none !important;
+            }
+            .org-page .org-selected-row{
               margin: 0 0 6px 0;
               color: rgba(203,213,225,0.98);
             }
-            section.main:has(#org-scope) .org-page .org-selected-row:last-child{ margin-bottom: 0; }
+            .org-page .org-selected-row:last-child{ margin-bottom: 0; }
+            .org-page .org-selected-empty{
+              color: rgba(226,232,240,0.92) !important;
+              font-style: italic;
+              letter-spacing: 0.01em;
+            }
+            .org-page .org-bottom + .org-bottom{
+              margin-top: 10px !important;
+            }
             .st-key-org_btn_top_refresh button,
             .st-key-org_btn_clear_selection button,
             .st-key-org_btn_sel_refresh button,
@@ -15795,9 +15989,297 @@ def page_organigrama(conn):
               width: 220px !important;
               min-width: 220px !important;
               max-width: 220px !important;
-              height: 42px !important;
-              min-height: 42px !important;
-              max-height: 42px !important;
+              height: 40px !important;
+              min-height: 40px !important;
+              max-height: 40px !important;
+              border-radius: 11px !important;
+              border: 1px solid rgba(148,163,184,0.34) !important;
+              background: rgba(15,23,42,0.72) !important;
+              color: rgba(241,245,249,0.96) !important;
+              font-weight: 700 !important;
+              white-space: nowrap !important;
+            }
+            .st-key-org_export_full_txt button,
+            .st-key-org_export_full_docx button{
+              width: 360px !important;
+              min-width: 360px !important;
+              max-width: 360px !important;
+              height: 40px !important;
+              min-height: 40px !important;
+              max-height: 40px !important;
+              border-radius: 11px !important;
+              border: 1px solid rgba(148,163,184,0.34) !important;
+              background: rgba(15,23,42,0.72) !important;
+              color: rgba(241,245,249,0.96) !important;
+              font-weight: 700 !important;
+              white-space: nowrap !important;
+              overflow: hidden !important;
+              text-overflow: ellipsis !important;
+            }
+            @media (max-width: 1024px){
+              .st-key-org_export_full_txt button,
+              .st-key-org_export_full_docx button{
+                width: 300px !important;
+                min-width: 300px !important;
+                max-width: 300px !important;
+              }
+            }
+            .org-page .org-import-page{
+              display: block;
+            }
+            .org-page .org-import-page .orgi-card{
+              border: 1px solid rgba(148,163,184,0.22);
+              border-radius: 12px;
+              background: rgba(15,23,42,0.20);
+              padding: 14px 16px;
+              margin: 0 0 14px 0;
+            }
+            .org-page .org-import-page .orgi-subtitle{
+              font-size: 1.12rem;
+              font-weight: 820;
+              color: rgba(248,250,252,0.98);
+              margin: 0 0 5px 0;
+              position: relative;
+              padding-bottom: 8px;
+            }
+            .org-page .org-import-page .orgi-subtitle::after{
+              content: "";
+              display: block;
+              width: min(50vw, 420px);
+              max-width: 100%;
+              height: 1px;
+              margin-top: 7px;
+              background: linear-gradient(90deg, rgba(148,163,184,0.46) 0%, rgba(148,163,184,0.24) 55%, rgba(148,163,184,0.02) 100%);
+            }
+            .org-page .org-import-page .orgi-desc{
+              margin: 4px 0 12px 0;
+              color: rgba(203,213,225,0.90);
+              font-size: 0.92rem;
+              line-height: 1.42;
+            }
+            .org-page .org-import-page .orgi-upload-wrap{
+              border: 1px dashed rgba(148,163,184,0.30);
+              border-radius: 10px;
+              padding: 10px 12px;
+              background: rgba(2,6,23,0.20);
+            }
+            .st-key-org_import_upload_box{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stFileUploader"]{
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stFileUploaderDropzone"]{
+              background: rgba(15,23,42,0.56) !important;
+              border: 1px dashed rgba(148,163,184,0.34) !important;
+              border-radius: 10px !important;
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stFileUploaderDropzone"]:hover{
+              border-color: rgba(56,189,248,0.58) !important;
+              background: rgba(30,41,59,0.70) !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stFileUploaderDropzone"] *{
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stFileUploaderDropzone"] svg{
+              color: rgba(148,163,184,0.96) !important;
+              fill: rgba(148,163,184,0.96) !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stBaseButton-secondary"]{
+              background: rgba(30,41,59,0.92) !important;
+              color: rgba(241,245,249,0.96) !important;
+              border: 1px solid rgba(148,163,184,0.34) !important;
+              border-radius: 9px !important;
+            }
+            .st-key-org_import_upload_box [data-testid="stBaseButton-secondary"]:hover{
+              background: rgba(51,65,85,0.96) !important;
+              border-color: rgba(56,189,248,0.58) !important;
+            }
+            .org-page .org-import-page .orgi-subcard{
+              border: 1px solid rgba(148,163,184,0.18);
+              border-radius: 10px;
+              background: rgba(2,6,23,0.16);
+              padding: 10px 12px;
+              margin-top: 10px;
+            }
+            .org-page .org-import-page .orgi-status-soft{
+              color: rgba(203,213,225,0.92);
+              font-style: italic;
+              margin-top: 6px;
+            }
+            .st-key-org_link_single_box [data-testid="stSelectbox"]{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-org_link_single_box [data-testid="stSelectbox"] p,
+            .st-key-org_link_single_box [data-testid="stSelectbox"] label,
+            .st-key-org_link_single_box [data-testid="stSelectbox"] div[data-baseweb="select"],
+            .st-key-org_link_single_box [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+            .st-key-org_link_single_box [data-testid="stSelectbox"] div[data-baseweb="select"] div{
+              color: #ffffff !important;
+            }
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"]{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"] p,
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"] label,
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"] div[data-baseweb="select"],
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+            .st-key-org_multi_parent_idx [data-testid="stSelectbox"] div[data-baseweb="select"] div{
+              color: #ffffff !important;
+            }
+            .st-key-org_parent_search_multi .stTextInput,
+            .st-key-org_child_search_multi .stTextInput,
+            .st-key-org_parent_search_multi [data-testid="stTextInputRootElement"],
+            .st-key-org_child_search_multi [data-testid="stTextInputRootElement"]{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"]{
+              border: 1px solid rgba(148,163,184,0.28) !important;
+              border-radius: 10px !important;
+              background: rgba(2,6,23,0.34) !important;
+              overflow: hidden !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"] table{
+              background: rgba(2,6,23,0.34) !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"] thead th{
+              background: rgba(15,23,42,0.92) !important;
+              color: rgba(241,245,249,0.96) !important;
+              border-bottom: 1px solid rgba(148,163,184,0.24) !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"] tbody td{
+              background: rgba(2,6,23,0.34) !important;
+              color: rgba(226,232,240,0.95) !important;
+              border-top: 1px solid rgba(148,163,184,0.14) !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"] tbody tr:nth-child(even) td{
+              background: rgba(15,23,42,0.42) !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stDataFrame"] tbody tr:hover td{
+              background: rgba(30,41,59,0.62) !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stCheckbox"]{
+              background: rgba(15,23,42,0.58) !important;
+              border: 1px solid rgba(148,163,184,0.26) !important;
+              border-radius: 7px !important;
+              padding: 2px 6px !important;
+            }
+            .st-key-struct_interna_grid [data-testid="stCheckbox"] svg{
+              color: rgba(241,245,249,0.96) !important;
+              fill: rgba(241,245,249,0.96) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"]{
+              border: 1px solid rgba(148,163,184,0.28) !important;
+              border-radius: 10px !important;
+              background: rgba(2,6,23,0.34) !important;
+              overflow: hidden !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"],
+            .st-key-struct_interna_grid [data-testid="stDataEditor"],
+            .st-key-struct_interna_grid [data-testid="stDataFrame"]{
+              --gdg-bg-cell: rgba(2,6,23,0.34) !important;
+              --gdg-bg-cell-medium: rgba(15,23,42,0.42) !important;
+              --gdg-bg-header: rgba(15,23,42,0.92) !important;
+              --gdg-bg-header-has-focus: rgba(30,41,59,0.92) !important;
+              --gdg-bg-header-hovered: rgba(30,41,59,0.92) !important;
+              --gdg-border-color: rgba(148,163,184,0.24) !important;
+              --gdg-horizontal-border-color: rgba(148,163,184,0.16) !important;
+              --gdg-text-dark: rgba(241,245,249,0.96) !important;
+              --gdg-text-medium: rgba(226,232,240,0.95) !important;
+              --gdg-text-light: rgba(203,213,225,0.90) !important;
+              --gdg-accent-color: rgba(56,189,248,0.72) !important;
+              --gdg-accent-fg: rgba(15,23,42,0.96) !important;
+              --gdg-cell-horizontal-padding: 10px !important;
+            }
+            .st-key-org_struct_grid_box .glide-data-grid,
+            .st-key-org_struct_grid_box .gdg-wrap,
+            .st-key-org_struct_grid_box .gdg-style,
+            .st-key-struct_interna_grid .glide-data-grid,
+            .st-key-struct_interna_grid .gdg-wrap,
+            .st-key-struct_interna_grid .gdg-style{
+              background: rgba(2,6,23,0.34) !important;
+            }
+            .st-key-org_struct_grid_box canvas,
+            .st-key-struct_interna_grid canvas{
+              background: rgba(2,6,23,0.34) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"] [role="grid"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"] table{
+              background: rgba(2,6,23,0.34) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"] [role="columnheader"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"] thead th{
+              background: rgba(15,23,42,0.92) !important;
+              color: rgba(241,245,249,0.96) !important;
+              border-bottom: 1px solid rgba(148,163,184,0.24) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"] [role="gridcell"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"] tbody td{
+              background: rgba(2,6,23,0.34) !important;
+              color: rgba(226,232,240,0.95) !important;
+              border-top: 1px solid rgba(148,163,184,0.14) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"] [role="row"]:nth-child(even) [role="gridcell"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"] tbody tr:nth-child(even) td{
+              background: rgba(15,23,42,0.42) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stDataEditor"] [role="row"]:hover [role="gridcell"],
+            .st-key-org_struct_grid_box [data-testid="stDataFrame"] tbody tr:hover td{
+              background: rgba(30,41,59,0.62) !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stCheckbox"]{
+              background: rgba(15,23,42,0.58) !important;
+              border: 1px solid rgba(148,163,184,0.26) !important;
+              border-radius: 7px !important;
+              padding: 2px 6px !important;
+            }
+            .st-key-org_struct_grid_box [data-testid="stCheckbox"] svg{
+              color: rgba(241,245,249,0.96) !important;
+              fill: rgba(241,245,249,0.96) !important;
+            }
+            /* Structură internă - override local peste tema globală light pentru tabele */
+            .st-key-org_struct_grid_box .stDataFrame table,
+            .st-key-org_struct_grid_box .stDataFrame tbody tr,
+            .st-key-org_struct_grid_box .stDataFrame tbody td,
+            .st-key-org_struct_grid_box .stDataFrame thead th,
+            .st-key-struct_interna_grid .stDataFrame table,
+            .st-key-struct_interna_grid .stDataFrame tbody tr,
+            .st-key-struct_interna_grid .stDataFrame tbody td,
+            .st-key-struct_interna_grid .stDataFrame thead th{
+              background: rgba(15,23,42,0.82) !important;
+              color: rgba(241,245,249,0.96) !important;
+            }
+            .st-key-org_struct_grid_box .stDataFrame tbody tr:nth-child(even) td,
+            .st-key-struct_interna_grid .stDataFrame tbody tr:nth-child(even) td{
+              background: rgba(30,41,59,0.82) !important;
+            }
+            .st-key-org_struct_grid_box .stDataFrame thead th,
+            .st-key-struct_interna_grid .stDataFrame thead th{
+              border-bottom: 1px solid rgba(148,163,184,0.28) !important;
+            }
+            .st-key-org_struct_grid_box .stDataFrame tbody td,
+            .st-key-struct_interna_grid .stDataFrame tbody td{
+              border-top: 1px solid rgba(148,163,184,0.14) !important;
             }
             </style>
             """,
@@ -15901,9 +16383,10 @@ def page_organigrama(conn):
     # Wrapper pentru layout-ul de organigramă (stilizat în CSS)
     st.markdown("<div class='org-wrap'>", unsafe_allow_html=True)
 
-    tab_org, tab_struct, tab_import = st.tabs(
-        ["Organigramă", "Structură internă", "Import organigramă"]
-    )
+    with st.container(key="org_main_tabs_box"):
+        tab_org, tab_struct, tab_import = st.tabs(
+            ["Organigramă", "Structură internă", "Import organigramă"]
+        )
 
     # ===========================
     # TAB 1 – ORGANIGRAMĂ
@@ -15924,9 +16407,16 @@ def page_organigrama(conn):
         q = ""
         sel_types: list[str] = []
 
-        st.markdown("<div class='org-section-title'>Mod de vizualizare</div>", unsafe_allow_html=True)
         st.markdown(
-            "<p class='org-section-desc'>Alege cum dorești să fie afișată organigrama.</p>",
+            "<div style='font-size:1.34rem;font-weight:780;color:rgba(248,250,252,0.98);margin:10px 0 4px 0;'>Mod de vizualizare</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 8px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p style='margin:4px 0 12px 0;color:rgba(203,213,225,0.90);font-size:0.94rem;line-height:1.45;'>Alege cum dorești să fie afișată organigrama.</p>",
             unsafe_allow_html=True,
         )
         st.markdown("<div class='org-view-radio'>", unsafe_allow_html=True)
@@ -15952,11 +16442,7 @@ def page_organigrama(conn):
 
         # ===== ORGANIGRAMĂ – full width sub panoul de control =====
         st.markdown('<div class="org-canvas">', unsafe_allow_html=True)
-        st.markdown("<div class='org-section-title'>Organigramă</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<p class='org-section-desc'>Vizualizează structura organizațională completă și accesează atât varianta ierarhică, cât și cea interactivă.</p>",
-            unsafe_allow_html=True,
-        )
+        st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 
         if view_mode == "Ierarhică":
             # Afișăm direct organigrama ierarhică (fără expander suplimentar)
@@ -15969,22 +16455,55 @@ def page_organigrama(conn):
 
         else:
             # Modul vizual interactiv (Cytoscape) – afișat direct când este selectat
-            cyto_box_scale = st.slider("📦 Mărime casete", 0.6, 3.0, 1.2, 0.1, key="cyto_box_scale_main")
-            cyto_font_size = st.slider("🔤 Font", 10, 34, 14, 1, key="cyto_font_size_main")
-            cyto_spacing = st.slider("↔️ Spacing", 0.6, 2.4, 1.0, 0.05, key="cyto_spacing_main")
-            cyto_start_collapsed = st.checkbox("Pornește colapsat (doar nivel 1)", True, key="cyto_start_collapsed_main")
-            cyto_enable_drag = st.checkbox("🖐️ Mută casete (Drag)", True, key="cyto_enable_drag_main")
+            st.markdown("<div class='org-controls-grid'>", unsafe_allow_html=True)
+            with st.container(key="org_ctrl_settings"):
+                st.markdown("<div class='org-control-block org-control-block-settings'>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:1.20rem;font-weight:760;color:rgba(248,250,252,0.98);margin:8px 0 4px 0;'>Setări afișare organigrama</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div style='width:min(50vw,420px);height:1px;margin:0 0 8px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<p style='margin:4px 0 10px 0;color:rgba(148,163,184,0.94);font-size:0.88rem;line-height:1.35;'>Ajustează dimensiunea și lizibilitatea elementelor din organigramă.</p>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+                cyto_box_scale = st.slider("📦 Mărime casete", 0.6, 3.0, 1.2, 0.1, key="cyto_box_scale_main")
+                cyto_font_size = st.slider("🔤 Font", 10, 34, 14, 1, key="cyto_font_size_main")
+                cyto_spacing = st.slider("↔️ Spacing", 0.6, 2.4, 1.0, 0.05, key="cyto_spacing_main")
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            cyto_custom_colors = st.checkbox("🎨 Culori personalizate", False, key="cyto_custom_colors_main")
-            cyto_colors = {}
-            if cyto_custom_colors:
-                cc1, cc2, cc3 = st.columns(3)
-                with cc1:
-                    cyto_colors["director_general"] = st.color_picker("DG", "#0B3C5D", key="cyto_col_dg")
-                with cc2:
-                    cyto_colors["directie"] = st.color_picker("Direcție", "#457B9D", key="cyto_col_directie")
-                with cc3:
-                    cyto_colors["default"] = st.color_picker("Default", "#D3E3F3", key="cyto_col_default")
+            with st.container(key="org_ctrl_interactive"):
+                st.markdown("<div class='org-control-block org-control-block-interactive'>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:1.20rem;font-weight:760;color:rgba(248,250,252,0.98);margin:8px 0 4px 0;'>Comportament interactiv</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div style='width:min(50vw,420px);height:1px;margin:0 0 8px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<p style='margin:4px 0 10px 0;color:rgba(148,163,184,0.94);font-size:0.88rem;line-height:1.35;'>Controlează modul de pornire, mutare și personalizare vizuală.</p>",
+                    unsafe_allow_html=True,
+                )
+                cyto_start_collapsed = st.checkbox("Pornește colapsat (doar nivel 1)", True, key="cyto_start_collapsed_main")
+                cyto_enable_drag = st.checkbox("🖐️ Mută casete (Drag)", True, key="cyto_enable_drag_main")
+                cyto_custom_colors = st.checkbox("🎨 Culori personalizate", False, key="cyto_custom_colors_main")
+                cyto_colors = {}
+                if cyto_custom_colors:
+                    cc1, cc2, cc3 = st.columns(3)
+                    with cc1:
+                        cyto_colors["director_general"] = st.color_picker("DG", "#0B3C5D", key="cyto_col_dg")
+                    with cc2:
+                        cyto_colors["directie"] = st.color_picker("Direcție", "#457B9D", key="cyto_col_directie")
+                    with cc3:
+                        cyto_colors["default"] = st.color_picker("Default", "#D3E3F3", key="cyto_col_default")
+                st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
             # Construim payload complet (unități + poziții + oameni)
             df_units_full = fetch_org_units(conn)
@@ -16476,11 +16995,19 @@ def page_organigrama(conn):
             st.markdown(f"<div class='org-selected-row'><strong>Denumire:</strong> {(row_unit_bottom[0] if row_unit_bottom else '—') or '—'}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='org-selected-row'><strong>Părinte:</strong> {(row_unit_bottom[2] if row_unit_bottom else '—') if row_unit_bottom else '—'}</div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='org-selected-row'>Nicio selecție activă.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='org-selected-row org-selected-empty'>Nicio selecție activă.</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='org-bottom'>", unsafe_allow_html=True)
-        st.markdown("<div class='org-section-title'>Acțiuni</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:1.20rem;font-weight:760;color:rgba(248,250,252,0.98);margin:8px 0 4px 0;'>Acțiuni</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         if st.button("Reîmprospătează", key="org_btn_sel_refresh"):
             st.rerun()
         if st.button("Curăță selecția", key="org_btn_sel_clear", disabled=not any(v is not None for v in (emp_id_bottom, pos_id_bottom, unit_id_bottom))):
@@ -16495,9 +17022,18 @@ def page_organigrama(conn):
         st.markdown("</div>", unsafe_allow_html=True)
 
         # ===== EXPORT – ORGANIGRAMĂ IERARHICĂ COMPLETĂ (TXT / DOCX) =====
-        st.markdown("### 📤 Export organigramă ierarhică")
-        st.caption(
-            "Descarcă structura completă a organigramei în format text sau document, pentru utilizare internă."
+        st.markdown("<div class='org-export'>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:1.20rem;font-weight:760;color:rgba(248,250,252,0.98);margin:8px 0 4px 0;'>📤 Export organigramă ierarhică</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p class='org-section-desc'>Descarcă structura completă a organigramei în format text sau document, pentru utilizare internă.</p>",
+            unsafe_allow_html=True,
         )
 
         nodes_full, children_full, roots_full = build_organigrama_tree_structure(df_units)
@@ -16550,6 +17086,7 @@ def page_organigrama(conn):
                 "Pentru exportul complet în DOCX ai nevoie de pachetul `python-docx` instalat. "
                 f"(Detalii tehnice: {e})"
             )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -16797,13 +17334,36 @@ def page_organigrama(conn):
                     n_func = 0
 
                 st.markdown(
-                    f"**Total înregistrări:** {n_total}  \n"
-                    f"**Structuri unice:** {n_loc}  \n"
-                    f"**Funcții unice:** {n_func}"
+                    (
+                        "<div style='max-width:min(50vw,420px); margin-bottom:12px;'>"
+                        f"<div><strong>Total înregistrări:</strong> {n_total}</div>"
+                        "<div style='height:1px;margin:4px 0;background:linear-gradient(90deg,rgba(148,163,184,0.42) 0%,rgba(148,163,184,0.20) 55%,rgba(148,163,184,0.02) 100%);'></div>"
+                        f"<div><strong>Structuri unice:</strong> {n_loc}</div>"
+                        "<div style='height:1px;margin:4px 0;background:linear-gradient(90deg,rgba(148,163,184,0.42) 0%,rgba(148,163,184,0.20) 55%,rgba(148,163,184,0.02) 100%);'></div>"
+                        f"<div><strong>Funcții unice:</strong> {n_func}</div>"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
                 )
 
-                # 3) Tabel principal
-                st.dataframe(df_view, use_container_width=True)
+                # 3) Tabel principal + selector discret de rând
+                df_grid = df_view.copy()
+                df_grid.insert(0, "Selectează", False)
+                with st.container(key="org_struct_grid_box"):
+                    edited_grid = st.data_editor(
+                        df_grid,
+                        use_container_width=True,
+                        hide_index=True,
+                        disabled=[c for c in df_grid.columns if c != "Selectează"],
+                        column_config={
+                            "Selectează": st.column_config.CheckboxColumn("Selectează"),
+                        },
+                        key="struct_interna_grid",
+                    )
+                if isinstance(edited_grid, pd.DataFrame) and "Selectează" in edited_grid.columns:
+                    selected_count = int(edited_grid["Selectează"].fillna(False).astype(bool).sum())
+                    if selected_count > 0:
+                        st.caption(f"Rânduri selectate: {selected_count}")
 
                 # 4) Export CSV – sub tabel, aliniat la stânga, doar dacă avem rezultate
                 if not df_view.empty:
@@ -16823,8 +17383,14 @@ def page_organigrama(conn):
     # TAB 3 – IMPORT ORGANIGRAMĂ
     # ===========================
     with tab_import:
-        # 1) TITLU SECȚIUNE
-        st.subheader("Import / sincronizare organigramă")
+        st.markdown("<div class='org-import-page'>", unsafe_allow_html=True)
+        # 1) HEADER TAB
+        hdr_l, hdr_r = st.columns([1, 0.26], vertical_alignment="center")
+        with hdr_l:
+            st.subheader("Import / sincronizare organigramă")
+        with hdr_r:
+            if st.button("🔄 Refresh status", key="org_status_refresh_btn"):
+                st.rerun()
 
         # 2) STATUS ORGANIGRAMĂ (KPI-uri)
         try:
@@ -16849,14 +17415,7 @@ def page_organigrama(conn):
         last_action = st.session_state.get("org_last_action") or "—"
         last_action_escaped = str(last_action).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        # Header: buton Refresh în colțul stânga (fără titlu suplimentar)
-        _status_header_left, _status_header_right = st.columns([0.18, 1])
-        with _status_header_left:
-            if st.button("🔄 Refresh status", key="org_status_refresh_btn"):
-                st.rerun()
-        with _status_header_right:
-            pass
-
+        st.markdown("<div class='orgi-card'>", unsafe_allow_html=True)
         st.markdown(
             "<div class='org-card'>"
             "<div class=\"org-status-head\">"
@@ -16872,14 +17431,23 @@ def page_organigrama(conn):
             "</div>",
             unsafe_allow_html=True,
         )
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
         # 3) SINCRONIZARE CU STATUL DE FUNCȚII – bloc dedicat
-        st.markdown("<div>", unsafe_allow_html=True)
-        st.markdown("### Sincronizare cu statul de funcții")
+        st.markdown("<div class='orgi-card'>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:1.22rem;font-weight:820;color:rgba(248,250,252,0.98);margin:0 0 4px 0;'>Sincronizare cu statul de funcții</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
 
-        st.caption(
-            "Poți genera sau actualiza automat structura organigramei pe baza tabelului "
-            "`stat_functii`, folosind coloanele „Loc de munca” și „Functie”."
+        st.markdown(
+            "<p class='orgi-desc'>Poți genera sau actualiza automat structura organigramei pe baza tabelului stat_functii, folosind coloanele „Loc de munca” și „Functie”.</p>",
+            unsafe_allow_html=True,
         )
 
         if st.button("Preia / sincronizează organigrama din statul de funcții", key="org_sync_stat"):
@@ -16899,14 +17467,23 @@ def page_organigrama(conn):
         st.markdown("</div>", unsafe_allow_html=True)
 
         # 5) IMPORT EXCEL
-        st.markdown("<div>", unsafe_allow_html=True)
-        st.markdown("### Importă organigrama din Excel")
-
-        fisier_org = st.file_uploader(
-            "Încarcă fișierul Excel cu structura organigramei",
-            type=["xlsx", "xls"],
-            key="org_import_file",
+        st.markdown("<div class='orgi-card'>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:1.22rem;font-weight:820;color:rgba(248,250,252,0.98);margin:0 0 4px 0;'>Importă organigrama din Excel</div>",
+            unsafe_allow_html=True,
         )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="org_import_upload_box"):
+            st.markdown("<div class='orgi-upload-wrap'>", unsafe_allow_html=True)
+            fisier_org = st.file_uploader(
+                "Încarcă fișierul Excel cu structura organigramei",
+                type=["xlsx", "xls"],
+                key="org_import_file",
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
 
         if fisier_org is not None:
             try:
@@ -16919,8 +17496,15 @@ def page_organigrama(conn):
         st.markdown("</div>", unsafe_allow_html=True)
 
         # 6) LEGĂTURI STRUCTURĂ (copil → părinte) + VALIDARE
-        st.markdown("<div>", unsafe_allow_html=True)
-        st.markdown("### Legături structură (copil → părinte) și validare")
+        st.markdown("<div class='orgi-card'>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:1.22rem;font-weight:820;color:rgba(248,250,252,0.98);margin:0 0 4px 0;'>Legături structură (copil → părinte) și validare</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+            unsafe_allow_html=True,
+        )
 
         df_units = pd.read_sql_query(
             "SELECT id, name, parent_id, type, is_active "
@@ -16930,12 +17514,13 @@ def page_organigrama(conn):
 
         # 🔗 După aceste date, formularul de legături copil → părinte rămâne la fel
         if df_units.empty:
-            st.caption("Nu există elemente pentru stabilirea legăturilor.")
+            st.markdown("<div class='orgi-status-soft'>Nu există elemente pentru stabilirea legăturilor.</div>", unsafe_allow_html=True)
         else:
             cur = conn.cursor()
             df_units_sorted = df_units.sort_values("id")
 
-            st.markdown("#### Legătură simplă copil → părinte")
+            st.markdown("<div class='orgi-subcard'>", unsafe_allow_html=True)
+            st.markdown("<div class='orgi-subtitle'>Legătură simplă copil → părinte</div>", unsafe_allow_html=True)
             # Marker pentru CSS: text alb la label + valoare pentru cele 2 selectbox-uri
             st.markdown(
                 '<div id="org-link-copil-parent-anchor" style="display:none" aria-hidden="true"></div>',
@@ -16952,6 +17537,13 @@ def page_organigrama(conn):
                 #org-link-copil-parent-anchor ~ div [data-testid="stSelectbox"] div[data-baseweb="select"] div {
                   color: #ffffff !important;
                 }
+                #org-link-copil-parent-anchor ~ div [data-testid="stSelectbox"]{
+                  width: 50% !important;
+                  max-width: 50% !important;
+                  min-width: 320px !important;
+                  margin-left: 0 !important;
+                  margin-right: auto !important;
+                }
                 div[role="listbox"] div[role="option"],
                 div[role="listbox"] div[role="option"] span {
                   color: #ffffff !important;
@@ -16966,22 +17558,23 @@ def page_organigrama(conn):
             ]
             child_ids = df_units_sorted["id"].tolist()
 
-            idx_child = st.selectbox(
-                "Alege unitatea COPIL",
-                options=list(range(len(child_labels))),
-                format_func=lambda i: child_labels[i],
-                key="org_link_child_single",
-            )
+            with st.container(key="org_link_single_box"):
+                idx_child = st.selectbox(
+                    "Alege unitatea COPIL",
+                    options=list(range(len(child_labels))),
+                    format_func=lambda i: child_labels[i],
+                    key="org_link_child_single",
+                )
 
-            parent_labels = child_labels
-            parent_ids = child_ids
+                parent_labels = child_labels
+                parent_ids = child_ids
 
-            idx_parent = st.selectbox(
-                "Alege unitatea PĂRINTE",
-                options=list(range(len(parent_labels))),
-                format_func=lambda i: parent_labels[i],
-                key="org_link_parent_single",
-            )
+                idx_parent = st.selectbox(
+                    "Alege unitatea PĂRINTE",
+                    options=list(range(len(parent_labels))),
+                    format_func=lambda i: parent_labels[i],
+                    key="org_link_parent_single",
+                )
 
             child_id = child_ids[idx_child]
             parent_id = parent_ids[idx_parent]
@@ -17000,16 +17593,25 @@ def page_organigrama(conn):
                         st.rerun()
                     except Exception as e:
                         st.error(f"Eroare la salvare: {e}")
+            st.markdown("</div>", unsafe_allow_html=True)
 
             # -----------------------------------------------------
             # 3) LEGĂTURI MULTIPLE – UN PĂRINTE → MAI MULȚI COPII
             # -----------------------------------------------------
-            st.markdown("### 🔗 Legături multiple pentru același părinte")
+            st.markdown("<div class='orgi-subcard'>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='font-size:1.16rem;font-weight:800;color:rgba(248,250,252,0.98);margin:0 0 4px 0;'>Legături multiple pentru același părinte</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='width:min(50vw,420px);height:1px;margin:0 0 10px 0;background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);'></div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-            st.caption(
-                "1. Alege PĂRINTELE.\n"
-                "2. Filtrează și selectează unitățile COPIL fără părinte.\n"
-                "3. Salvează toate legăturile dintr-o dată."
+            st.markdown(
+                "<p class='orgi-desc'>1. Alege PĂRINTELE.<br>2. Filtrează și selectează unitățile COPIL fără părinte.<br>3. Salvează toate legăturile dintr-o dată.</p>",
+                unsafe_allow_html=True,
             )
 
             parent_search = st.text_input(
@@ -17061,10 +17663,13 @@ def page_organigrama(conn):
                     ]
 
                 if df_children_all.empty:
-                    st.info(
-                        "Nu există noduri fără părinte care să corespundă filtrului și să poată fi legate sub acest părinte."
+                    st.markdown(
+                        "<div class='orgi-status-soft'>Nu există noduri fără părinte care să corespundă filtrului și să poată fi legate sub acest părinte.</div>",
+                        unsafe_allow_html=True,
                     )
+            st.markdown("</div>", unsafe_allow_html=True)
 
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -17073,436 +17678,979 @@ def page_organigrama(conn):
 
 def page_stat_de_functii(conn: sqlite3.Connection):
     """Pagină pentru STATUL DE FUNCȚII: salvare/editare + import din Excel cu mapare de câmpuri."""
-    st.markdown('<h2 class="page-title">Stat de funcții</h2>', unsafe_allow_html=True)
-
-    # Marker + CSS local pentru structurare pe carduri
-    st.markdown('<span id="stat-scope"></span>', unsafe_allow_html=True)
+    # CSS țintește .st-key-stat_page_shell (stabil în DOM); :has(#stat-scope) nu se aplică mereu în Streamlit.
     st.markdown(
         """
         <style>
-        section.main:has(#stat-scope) .stat-card{
-          background: #162a3d;
-          border: 1px solid #2c445c;
+        /* Suprascrie globalul `.stat-card { border: … !important }` din tema – altfel apar benzi/chenare care „taie” pagina */
+        .st-key-stat_page_shell .stat-card{
+          background: rgba(22,42,61,0.94) !important;
+          border: none !important;
+          border-top: none !important;
           border-radius: 10px;
           padding: 24px 28px;
-          margin-bottom: 28px;
+          margin-bottom: 36px;
+          margin-top: 0 !important;
+          box-shadow: none !important;
+          outline: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
         }
-        section.main:has(#stat-scope) .stat-card h4{
+        /* Streamlit înconjoară fiecare markdown/widget: fără muchie sub subtitlul principal */
+        .st-key-stat_page_shell [data-testid="stMarkdown"],
+        .st-key-stat_page_shell [data-testid="stMarkdownContainer"],
+        .st-key-stat_page_shell [data-testid="element-container"],
+        .st-key-stat_page_shell [data-testid="stElementContainer"]{
+          border: none !important;
+          border-top: none !important;
+          border-bottom: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          background-image: none !important;
+        }
+        .st-key-stat_page_shell .stat-card h4{
           margin-top: 0;
           margin-bottom: 16px;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stFileUploaderDropzone"]{
+          background: rgba(15,23,42,0.56) !important;
+          border: 1px dashed rgba(148,163,184,0.34) !important;
+          border-radius: 10px !important;
+          color: rgba(226,232,240,0.96) !important;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stFileUploaderDropzone"]:hover{
+          border-color: rgba(148,163,184,0.45) !important;
+          background: rgba(30,41,59,0.70) !important;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stFileUploaderDropzone"] *{
+          color: rgba(226,232,240,0.96) !important;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stFileUploaderDropzone"] svg{
+          color: rgba(148,163,184,0.96) !important;
+          fill: rgba(148,163,184,0.96) !important;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stBaseButton-secondary"]{
+          background: rgba(30,41,59,0.92) !important;
+          color: rgba(241,245,249,0.96) !important;
+          border: 1px solid rgba(148,163,184,0.34) !important;
+          border-radius: 9px !important;
+        }
+        .st-key-stat_functii_xlsx [data-testid="stBaseButton-secondary"]:hover{
+          background: rgba(51,65,85,0.96) !important;
+          border-color: rgba(148,163,184,0.42) !important;
+        }
+        /* Taburi interne (ex. de la data editor) folosite doar ca spațiere: le ascundem */
+        .st-key-stat_page_shell [data-testid="stTabs"] [role="tablist"]{
+          display: none !important;
+        }
+        /* Ascundem doar tab-panelurile tab-set-urilor interne (nu și tab-set-ul principal) */
+        .st-key-stat_page_shell [data-testid="stTabs"] [role="tabpanel"]:not(
+          .st-key-stat_main_tabs_box [data-testid="stTabs"] [role="tabpanel"]
+        ){
+          display: none !important;
+        }
+        .st-key-stat_main_tabs_box div[data-testid="stTabs"] > [role="tablist"]{
+          display: flex !important;
+          gap: 0 !important;
+          margin: 6px 0 14px 0 !important;
+          padding: 0 !important;
+          border-bottom: none !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          flex-wrap: nowrap !important;
+        }
+        /* Scoatem spațierea verticală suplimentară din tab-panel (ca „Configurare coloane” să fie imediat sub titlu) */
+        .st-key-stat_main_tabs_box div[data-testid="stTabs"] [role="tabpanel"]{
+          padding-top: 0 !important;
+        }
+        .st-key-stat_main_tabs_box div[data-testid="stTabs"] button[role="tab"]{
+          min-height: 38px !important;
+          height: 38px !important;
+          padding: 0 14px !important;
+          border: none !important;
+          border-radius: 0 !important;
+          /* underline-ul de stare activă (fără linii gri/chenare) */
+          border-bottom: 2px solid transparent !important;
+          background: transparent !important;
+          color: rgba(226,232,240,0.88) !important;
+          font-size: 0.94rem !important;
+          font-weight: 700 !important;
+          margin: 0 !important;
+          transition: color .18s ease, border-color .18s ease !important;
+          white-space: nowrap !important;
+        }
+        .st-key-stat_main_tabs_box div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+          background: transparent !important;
+          color: #ffffff !important;
+          border-bottom: 2px solid rgba(56,189,248,0.92) !important;
+          box-shadow: none !important;
+        }
+        /* Liniile fine de design sunt doar cele din _stat_subtitle (gradient scurt) */
+        .st-key-stat_page_shell hr,
+        .st-key-stat_page_shell [role="separator"]{
+          display: none !important;
+          border: 0 !important;
+          height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          visibility: hidden !important;
+        }
+        .st-key-stat_page_shell [data-testid="stDivider"]{
+          display: none !important;
+          height: 0 !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: 0 !important;
+        }
+        .st-key-stat_page_shell .stMarkdown hr{
+          display: none !important;
+          border: 0 !important;
+          height: 0 !important;
+          margin: 0 !important;
+        }
+        /* Fără sublinieri / bare pe titlurile Markdown din pagină (păstrăm doar liniile din subtitluri) */
+        .st-key-stat_page_shell h1,
+        .st-key-stat_page_shell h2,
+        .st-key-stat_page_shell h3,
+        .st-key-stat_page_shell h4,
+        .st-key-stat_page_shell h5,
+        .st-key-stat_page_shell h6{
+          border: none !important;
+          border-bottom: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stTabs"] [role="tabpanel"]{
+          border-top: none !important;
+          border-bottom: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stTabs"] [data-baseweb="tab-border"]{
+          display: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stTabs"] > div{
+          border-top: none !important;
+          border-bottom: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stVerticalBlockBorderWrapper"]{
+          border: none !important;
+          border-top: none !important;
+          border-bottom: none !important;
+          box-shadow: none !important;
+          background-image: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stVerticalBlockBorderWrapper"]::before,
+        .st-key-stat_page_shell [data-testid="stVerticalBlockBorderWrapper"]::after{
+          display: none !important;
+          content: none !important;
+        }
+        /* Eliminare forțată linii / borduri de layout pe „fundal” (strict Stat de funcții) */
+        .st-key-stat_page_shell [data-testid="stAppViewBlockContainer"],
+        .st-key-stat_page_shell [data-testid="stMainBlockContainer"],
+        .st-key-stat_page_shell section[data-testid="stMain"] > div,
+        .st-key-stat_page_shell .block-container{
+          border: none !important;
+          box-shadow: none !important;
+          background-image: none !important;
+          outline: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stVerticalBlock"]{
+          border: 0 !important;
+          border-top: 0 !important;
+          border-bottom: 0 !important;
+          box-shadow: none !important;
+          outline: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stVerticalBlock"] > div,
+        .st-key-stat_page_shell [data-testid="stVerticalBlockBorderWrapper"] > div{
+          border-top: 0 !important;
+          border-bottom: 0 !important;
+          box-shadow: none !important;
+          background-image: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stHorizontalBlock"]{
+          border: none !important;
+          border-top: 0 !important;
+          border-bottom: 0 !important;
+          box-shadow: none !important;
+          background-image: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stDecoration"]{
+          display: none !important;
+          height: 0 !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stDataEditor"],
+        .st-key-stat_page_shell [data-testid="stDataFrame"]{
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
+        }
+        /* Glide Data Grid: fără chenar/selecție în albastru (accent implicit Streamlit) */
+        .st-key-stat_page_shell [data-testid="stDataEditor"]{
+          --gdg-accent-color: rgba(148,163,184,0.42) !important;
+          --gdg-accent-fg: rgba(15,23,42,0.96) !important;
+        }
+        .st-key-stat_page_shell [data-testid="stDataEditor"] > div,
+        .st-key-stat_page_shell [data-testid="stDataFrame"] > div{
+          border-top: 0 !important;
+          border-bottom: 0 !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_page_shell [data-testid="stDataEditor"] .glide-data-grid,
+        .st-key-stat_page_shell [data-testid="stDataEditor"] .gdg-wrap,
+        .st-key-stat_page_shell [data-testid="stDataEditor"] canvas{
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_main_tabs_box [data-testid="stTabs"],
+        .st-key-stat_main_tabs_box [data-testid="stTabs"] > div{
+          border: none !important;
+          box-shadow: none !important;
+          background-image: none !important;
+        }
+        .st-key-stat_page_shell h2.page-title{
+          border: none !important;
+          box-shadow: none !important;
+          padding-bottom: 0 !important;
+          margin-bottom: 0.5rem !important;
+        }
+        .st-key-stat_page_shell [data-testid="column"]{
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .st-key-stat_page_shell [data-baseweb="divider"]{
+          display: none !important;
+          height: 0 !important;
+          border: 0 !important;
+        }
+        .st-key-stat_page_shell [data-testid="stVerticalBlock"]::before,
+        .st-key-stat_page_shell [data-testid="stVerticalBlock"]::after{
+          display: none !important;
+          content: none !important;
+        }
+        .st-key-stat_cfg_half,
+        .st-key-stat_export_half{
+          width: 100% !important;
+          max-width: 100% !important;
+          min-width: 0 !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        /* Buton stack + export: aliniere stânga (nu center) */
+        .st-key-stat_save_btn,
+        .st-key-stat_export_btns,
+        .st-key-stat_export_half{
+          text-align: left !important;
+        }
+        .st-key-stat_cfg_half .stTextInput,
+        .st-key-stat_cfg_half [data-testid="stMultiSelect"]{
+          max-width: 100% !important;
+        }
+        /* Uniformizare controale: aceeași dimensiune ca butoanele existente (420x40) */
+        .st-key-stat_cfg_left,
+        .st-key-stat_cfg_right{
+          width: 420px !important;
+          max-width: 420px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          text-align: left !important;
+        }
+        .st-key-stat_cfg_half div[data-testid="stTextInput"],
+        .st-key-stat_cfg_half div[data-testid="stMultiSelect"]{
+          width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+        }
+        .st-key-stat_cfg_half div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
+        .st-key-stat_cfg_half div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div{
+          width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+        }
+        .st-key-stat_cfg_half div[data-testid="stTextInput"] input{
+          min-height: 40px !important;
+          height: 40px !important;
+        }
+        .st-key-stat_cfg_half div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+        .st-key-stat_cfg_half div[data-testid="stMultiSelect"] div[data-baseweb="base-select"] > div{
+          width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+        }
+        /* Forțăm aliniere la stânga și în wrapper-ele BaseWeb (Streamlit uneori center-uiește) */
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] div[data-baseweb="base-input"] > div{
+          justify-content: flex-start !important;
+          margin-left: 0 !important;
+        }
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="base-select"] > div{
+          justify-content: flex-start !important;
+          margin-left: 0 !important;
+        }
+        /* Label + afișaj text (Multiselect) aliniate la stânga */
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] label,
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] p,
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] label,
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] p{
+          text-align: left !important;
+          margin-left: 0 !important;
+        }
+        /* Forțăm lățimea 420px ca restul butoanelor din pagină */
+        .st-key-stat_cfg_left div[data-testid="stTextInput"],
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"]{
+          width: 420px !important;
+          max-width: 420px !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] div[data-baseweb="input"],
+        .st-key-stat_cfg_left div[data-testid="stTextInput"] div[data-baseweb="base-input"],
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="select"],
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="base-select"]{
+          width: 420px !important;
+          max-width: 420px !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        /* Textul din multiselect să urmeze left-align */
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="select"] span,
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"] div[data-baseweb="base-select"] span{
+          text-align: left !important;
+          justify-content: flex-start !important;
+          margin-left: 0 !important;
+        }
+        .st-key-stat_cfg_left [data-testid="stButton"] > button,
+        .st-key-stat_cfg_right [data-testid="stButton"] > button,
+        .st-key-stat_cfg_half [data-testid="stButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          display: block !important;
+        }
+        .st-key-stat_cfg_left div[data-testid="stTextInput"],
+        .st-key-stat_cfg_right div[data-testid="stMultiSelect"]{
+          margin-bottom: 6px !important;
+        }
+        .st-key-stat_cfg_btns [data-testid="stButton"] > button,
+        .st-key-stat_save_btn [data-testid="stButton"] > button,
+        .st-key-stat_export_btns [data-testid="stButton"] > button,
+        .st-key-stat_export_btns [data-testid="stDownloadButton"] > button{
+          width: 420px !important;
+          min-width: 420px !important;
+          max-width: 420px !important;
+          min-height: 40px !important;
+          height: 40px !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          display: block !important;
+        }
+        /* Butonul de sincronizare din Export (nu e în stat_export_btns) */
+        .st-key-stat_export_half [data-testid="stButton"] > button{
+          margin-left: 0 !important;
+          margin-right: 0 !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    tab_saved, tab_import = st.tabs(
-        ["Stat de funcții salvat", "Import din fișier Excel"]
-    )
-
-    # ---------------------------------------------------------
-    # TAB 1: STAT DE FUNCȚII SALVAT (EDITABIL)
-    # ---------------------------------------------------------
-    with tab_saved:
-        st.markdown("### Stat de funcții salvat (editare directă)")
-
-        # Card 1 – Sincronizare bidirecțională Stat ↔ Angajați
-        st.markdown('<div class="stat-card">', unsafe_allow_html=True)
-        with st.expander("🔁 Sincronizare (Stat ↔ Angajați)", expanded=False):
-            colA, colB = st.columns(2)
-            with colA:
-                overwrite = st.checkbox(
-                    "Suprascrie datele existente (overwrite)",
-                    value=False,
-                    key="sync_bidir_overwrite_stat",
-                )
-            with colB:
-                confirm = st.checkbox(
-                    "Confirm că vreau să rulez sincronizarea.",
-                    value=False,
-                    key="sync_bidir_confirm_stat",
-                )
-
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("🔁 Angajați → Stat de funcții", key="btn_sync_emp_to_stat"):
-                    if not confirm:
-                        st.warning("Bifează confirmarea înainte de sincronizare.")
-                    else:
-                        try:
-                            n_imp = sync_stat_functii_from_employees(conn, overwrite=bool(overwrite))
-                            st.success(f"Stat de funcții actualizat din Angajați: {n_imp} rânduri.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Eroare la preluarea din Angajați: {e}")
-
-            with c2:
-                if st.button("🔁 Stat de funcții → Angajați", key="btn_sync_stat_to_emp_bidir"):
-                    if not confirm:
-                        st.warning("Bifează confirmarea înainte de sincronizare.")
-                    else:
-                        try:
-                            n_upd = sync_employees_from_stat_functii_bidir(conn, overwrite=bool(overwrite))
-                            st.success(f"Angajați actualizați din Stat de funcții: {n_upd}.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Eroare la preluarea din Stat de funcții: {e}")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='stat_functii'"
+    def _stat_subtitle(title: str, kind: str = "card") -> None:
+        from html import escape as _escape
+        safe_title = _escape(title or "")
+        grad = (
+            "width:min(50vw,420px);max-width:100%;height:1px;"
+            "margin:7px 0 0 0;"
+            "background:linear-gradient(90deg,rgba(148,163,184,0.46) 0%,rgba(148,163,184,0.24) 55%,rgba(148,163,184,0.02) 100%);"
         )
-        exists = cur.fetchone() is not None
-
-        if not exists:
-            st.info(
-                "Nu există încă un stat de funcții salvat în baza de date. "
-                "Importă mai întâi un fișier Excel în tab-ul „Import din fișier Excel”."
+        if kind == "main":
+            st.markdown(
+                (
+                    "<div style='"
+                    "font-size:1.34rem;"
+                    "font-weight:860;"
+                    "color:rgba(248,250,252,0.99);"
+                    "margin:2px 0 4px 0;"
+                    "line-height:1.25;"
+                    "'>"
+                    f"{safe_title}"
+                    "</div>"
+                    f"<div style='{grad}margin-bottom:16px;'></div>"
+                ),
+                unsafe_allow_html=True,
             )
         else:
-            df = pd.read_sql_query("SELECT * FROM stat_functii", conn)
-
-            # Card 2 – Configurare câmpuri (coloane)
-            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
-            st.markdown("#### Configurare câmpuri (coloane)")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                new_col_name = st.text_input(
-                    "Nume câmp nou (coloană)",
-                    key="stat_new_col",
-                    help="Ex: „Observații”, „Cod intern”, etc.",
-                )
-                if st.button("➕ Adaugă câmp", key="btn_add_stat_col"):
-                    if new_col_name:
-                        new_col_name = new_col_name.strip()
-                        if new_col_name and new_col_name not in df.columns:
-                            df[new_col_name] = ""
-                        else:
-                            st.warning("Câmpul există deja sau este gol.")
-
-            with col2:
-                cols_to_drop = st.multiselect(
-                    "Alege câmpurile de șters",
-                    options=list(df.columns),
-                    key="stat_cols_drop",
-                )
-                if st.button("🗑️ Șterge câmpurile selectate", key="btn_drop_stat_cols"):
-                    if cols_to_drop:
-                        df = df.drop(columns=list(cols_to_drop))
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            # Card 3 – Editare stat de funcții (tabel mare + salvare)
-            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
-            st.markdown("#### Editare date")
-            edited_df = st.data_editor(
-                df,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="stat_editor",
+            st.markdown(
+                (
+                    "<div style='"
+                    "font-size:1.02rem;"
+                    "font-weight:820;"
+                    "color:rgba(241,245,249,0.98);"
+                    "margin:0 0 4px 0;"
+                    "line-height:1.35;"
+                    "'>"
+                    f"{safe_title}"
+                    "</div>"
+                    f"<div style='{grad}margin-bottom:14px;'></div>"
+                ),
+                unsafe_allow_html=True,
             )
 
-            if st.button("💾 Salvează modificările în statul de funcții", key="btn_save_stat"):
-                edited_df.to_sql("stat_functii", conn, if_exists="replace", index=False)
+    st.markdown(
+        '<h2 class="page-title">Stat de funcții</h2>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<span id="stat-scope" style="display:none" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
 
-                # 1) Stat -> Organigramă (org_units + org_positions)
-                nu, np = refresh_organigrama_from_stat(conn)
+    with st.container(key="stat_page_shell"):
+        with st.container(key="stat_main_tabs_box"):
+            tab_saved, tab_import = st.tabs(
+                ["Editare stat de funcții", "Import din fișier Excel"]
+            )
 
-                # 2) Stat -> employees (pentru ca Dosar Profesional / Pontaj să reflecte schimbările)
-                n_upd = sync_employees_from_stat_functii(conn)
+        # ---------------------------------------------------------
+        # TAB 1: STAT DE FUNCȚII SALVAT (EDITABIL)
+        # ---------------------------------------------------------
+        with tab_saved:
+            # (titlul de tip subtitle a fost scos la cerere)
 
-                msg = "Statul de funcții a fost salvat în baza de date."
-                if nu or np:
-                    msg += f" | Organigramă actualizată: {nu} unități noi, {np} posturi noi."
-                if n_upd:
-                    msg += f" | Angajați sincronizați: {n_upd}."
-                st.success(msg)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='stat_functii'"
+            )
+            exists = cur.fetchone() is not None
 
-                # Reîncărcare UI ca să se vadă imediat în Organigramă / Centralizator / Dosar / Pontaj
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            # Card 4 – Export & sincronizare globală
-            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
-            st.markdown("#### Export și sincronizare globală")
-
-            # Export rapid în Excel
-            excel_bytes = _df_to_xlsx_bytes(edited_df, sheet_name="Stat_de_functii")
-            if excel_bytes is None:
-                # Fallback CSV (nu necesită openpyxl/xlsxwriter)
-                excel_bytes = edited_df.to_csv(index=False).encode('utf-8')
-                mime = 'text/csv'
+            if not exists:
+                st.info(
+                    "Nu există încă un stat de funcții salvat în baza de date. "
+                    "Importă mai întâi un fișier Excel în tab-ul „Import din fișier Excel”."
+                )
             else:
-                mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            st.download_button(
-                "⬇️ Exportă statul de funcții salvat (Excel)",
-                data=excel_bytes,
-                file_name="stat_de_functii_salvat.xlsx",
-                mime=(mimetypes.guess_type("stat_de_functii_salvat.xlsx")[0] or "application/octet-stream"),
-                key="btn_export_stat_functii_salvat",
+                df = pd.read_sql_query("SELECT * FROM stat_functii", conn)
+
+                # --- Configurare coloane: păstrăm efectul asupra tabelului, dar o randăm mai jos ---
+                if "stat_pending_add_cols" not in st.session_state:
+                    st.session_state["stat_pending_add_cols"] = []
+                if "stat_pending_drop_cols" not in st.session_state:
+                    st.session_state["stat_pending_drop_cols"] = []
+
+                def _stat_apply_pending_schema(_df: pd.DataFrame) -> pd.DataFrame:
+                    add_cols = [c for c in (st.session_state.get("stat_pending_add_cols") or []) if str(c).strip()]
+                    drop_cols = [c for c in (st.session_state.get("stat_pending_drop_cols") or []) if str(c).strip()]
+
+                    for c in add_cols:
+                        if c not in _df.columns:
+                            _df[c] = ""
+                    if drop_cols:
+                        _df = _df.drop(columns=[c for c in drop_cols if c in _df.columns], errors="ignore")
+                    return _df
+
+                df = _stat_apply_pending_schema(df)
+
+                # Card 3 – Editare stat de funcții (tabel mare + salvare)
+                _stat_subtitle("Editare date")
+                edited_df = st.data_editor(
+                    df,
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key="stat_editor",
+                )
+                # UX: în grid-ul Stat de funcții, Enter -> deplasare la dreapta (aceeași persoană/rând)
+                # (best-effort, fără impact pe logica de date)
+                try:
+                    import streamlit.components.v1 as components
+
+                    components.html(
+                        r"""
+                        <script>
+                        (function () {
+                          const doc = window.parent?.document || document;
+                          const FLAG = "__statEditorEnterGoesRight__";
+                          if (window[FLAG]) return;
+                          window[FLAG] = true;
+
+                          function inStatEditor(target) {
+                            try {
+                              if (!target) return false;
+                              const host = doc.querySelector('.st-key-stat_editor');
+                              if (!host) return false;
+                              return host.contains(target);
+                            } catch (e) { return false; }
+                          }
+
+                          function fireKey(el, type, key, code) {
+                            try {
+                              const evt = new KeyboardEvent(type, {
+                                key: key,
+                                code: code || key,
+                                bubbles: true,
+                                cancelable: true
+                              });
+                              el.dispatchEvent(evt);
+                            } catch (e) {}
+                          }
+
+                          function getGridInfo(target) {
+                            try {
+                              const host = doc.querySelector('.st-key-stat_editor');
+                              if (!host) return null;
+                              const cell = (target && target.closest) ? target.closest('[role="gridcell"],[role="columnheader"]') : null;
+                              const grid = cell ? cell.closest('[role="grid"]') : (host.querySelector('[role="grid"]') || null);
+                              if (!grid) return { host, grid: null, colIndex: null, maxCol: null };
+
+                              let colIndex = null;
+                              const cell2 = (target && target.closest) ? target.closest('[role="gridcell"]') : null;
+                              let rowIndex = null;
+                              if (cell2 && cell2.getAttribute) {
+                                const v = parseInt(cell2.getAttribute('aria-colindex') || '', 10);
+                                if (!Number.isNaN(v)) colIndex = v;
+                                const r = parseInt(cell2.getAttribute('aria-rowindex') || '', 10);
+                                if (!Number.isNaN(r)) rowIndex = r;
+                              }
+
+                              let maxCol = null;
+                              const hdrs = grid.querySelectorAll('[role="columnheader"][aria-colindex]');
+                              if (hdrs && hdrs.length) {
+                                let m = 0;
+                                hdrs.forEach(h => {
+                                  const v = parseInt(h.getAttribute('aria-colindex') || '', 10);
+                                  if (!Number.isNaN(v) && v > m) m = v;
+                                });
+                                if (m > 0) maxCol = m;
+                              }
+                              return { host, grid, colIndex, rowIndex, maxCol };
+                            } catch (e) { return null; }
+                          }
+
+                          function focusCell(grid, rowIndex, colIndex) {
+                            try {
+                              if (!grid || !rowIndex || !colIndex) return false;
+                              const sel = `[role="gridcell"][aria-rowindex="${rowIndex}"][aria-colindex="${colIndex}"]`;
+                              const cell = grid.querySelector(sel);
+                              if (!cell) return false;
+                              cell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                              cell.click();
+                              // încearcă să pună cursorul în editorul intern (dacă există)
+                              const editor = cell.querySelector('input, textarea, [contenteditable="true"]');
+                              if (editor && editor.focus) editor.focus();
+                              return true;
+                            } catch (e) { return false; }
+                          }
+
+                          doc.addEventListener('keydown', function (e) {
+                            // doar în grid-ul stat_editor
+                            if (!inStatEditor(e.target)) return;
+                            // Enter simplu (nu Shift/Ctrl/Alt)
+                            if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+
+                            // prevenim "down" și încercăm să mergem "right"
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            const el = doc.activeElement || e.target;
+                            const info = getGridInfo(e.target);
+                            const atLastCol = !!(info && info.colIndex && info.maxCol && info.colIndex >= info.maxCol);
+
+                            if (atLastCol) {
+                              // Ultima coloană: Enter coboară pe rândul următor și revine la început (Marca)
+                              fireKey(el, 'keydown', 'ArrowDown', 'ArrowDown');
+                              fireKey(el, 'keyup',   'ArrowDown', 'ArrowDown');
+                              // după mutare, încercăm "Home" (start-of-row); fallback: mai multe ArrowLeft
+                              setTimeout(function () {
+                                // 1) focus explicit pe Marca (col 1) din rândul următor, dacă avem coordonate
+                                if (info && info.grid && info.rowIndex) {
+                                  const ok = focusCell(info.grid, info.rowIndex + 1, 1);
+                                  if (ok) return;
+                                }
+                                // 2) fallback: Home + ArrowLeft
+                                fireKey(el, 'keydown', 'Home', 'Home');
+                                fireKey(el, 'keyup',   'Home', 'Home');
+                                for (let i = 0; i < 30; i++) {
+                                  fireKey(el, 'keydown', 'ArrowLeft', 'ArrowLeft');
+                                  fireKey(el, 'keyup',   'ArrowLeft', 'ArrowLeft');
+                                }
+                              }, 0);
+                            } else {
+                              // Coloane intermediare: Enter -> dreapta (aceeași persoană/rând)
+                              // 1) încercăm Tab (de obicei Glide îl tratează ca next cell)
+                              fireKey(el, 'keydown', 'Tab', 'Tab');
+                              fireKey(el, 'keyup',   'Tab', 'Tab');
+                              // 2) fallback: ArrowRight
+                              fireKey(el, 'keydown', 'ArrowRight', 'ArrowRight');
+                              fireKey(el, 'keyup',   'ArrowRight', 'ArrowRight');
+                            }
+                          }, true);
+                        })();
+                        </script>
+                        """,
+                        height=0,
+                    )
+                except Exception:
+                    pass
+
+                with st.container(key="stat_save_btn"):
+                    if st.button("💾 Salvează modificările în statul de funcții", key="btn_save_stat"):
+                        edited_df.to_sql("stat_functii", conn, if_exists="replace", index=False)
+
+                        # 1) Stat -> Organigramă (org_units + org_positions)
+                        nu, np = refresh_organigrama_from_stat(conn)
+
+                        # 2) Stat -> employees (pentru ca Dosar Profesional / Pontaj să reflecte schimbările)
+                        n_upd = sync_employees_from_stat_functii(conn)
+
+                        msg = "Statul de funcții a fost salvat în baza de date."
+                        if nu or np:
+                            msg += f" | Organigramă actualizată: {nu} unități noi, {np} posturi noi."
+                        if n_upd:
+                            msg += f" | Angajați sincronizați: {n_upd}."
+                        st.success(msg)
+
+                        # Reîncărcare UI ca să se vadă imediat în Organigramă / Centralizator / Dosar / Pontaj
+                        st.rerun()
+
+                # Configurare coloane (mutată sub butonul Salvează, fără a pierde funcționalitatea)
+                def _stat_cfg_add_col() -> None:
+                    raw = str(st.session_state.get("stat_new_col", "") or "").strip()
+                    if not raw:
+                        return
+                    pending = list(st.session_state.get("stat_pending_add_cols") or [])
+                    if raw not in pending:
+                        pending.append(raw)
+                    st.session_state["stat_pending_add_cols"] = pending
+                    st.session_state["stat_new_col"] = ""
+
+                def _stat_cfg_drop_cols() -> None:
+                    sel = st.session_state.get("stat_cols_drop") or []
+                    pending = list(st.session_state.get("stat_pending_drop_cols") or [])
+                    for c in sel:
+                        if c not in pending:
+                            pending.append(c)
+                    st.session_state["stat_pending_drop_cols"] = pending
+                    st.session_state["stat_cols_drop"] = []
+
+                # Opțiuni de șters din schema curentă (după add/drop pending)
+                cfg_cols_now = list(df.columns)
+                with st.container(key="stat_cfg_half"):
+                    _stat_subtitle("Configurare coloane")
+                    with st.container(key="stat_cfg_left"):
+                        st.text_input(
+                            "Creează câmp nou (coloană)",
+                            key="stat_new_col",
+                            help="Ex: „Observații”, „Cod intern”, etc.",
+                        )
+                        st.button(
+                            "➕ Adaugă câmp",
+                            key="btn_add_stat_col",
+                            use_container_width=True,
+                            on_click=_stat_cfg_add_col,
+                        )
+
+                    with st.container(key="stat_cfg_right"):
+                        st.multiselect(
+                            "Alege câmpurile de șters",
+                            options=cfg_cols_now,
+                            key="stat_cols_drop",
+                        )
+                        st.button(
+                            "🗑️ Șterge câmpurile selectate",
+                            key="btn_drop_stat_cols",
+                            use_container_width=True,
+                            on_click=_stat_cfg_drop_cols,
+                        )
+
+                # Card 4 – Export & sincronizare globală (lățime 50%; tabelul rămâne deasupra, full width)
+                with st.container(key="stat_export_half"):
+                    _stat_subtitle("Export și sincronizare globală")
+
+                    # Export rapid în Excel
+                    excel_bytes = _df_to_xlsx_bytes(edited_df, sheet_name="Stat_de_functii")
+                    if excel_bytes is None:
+                        # Fallback CSV (nu necesită openpyxl/xlsxwriter)
+                        excel_bytes = edited_df.to_csv(index=False).encode('utf-8')
+                        mime = 'text/csv'
+                    else:
+                        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    with st.container(key="stat_export_btns"):
+                        st.download_button(
+                            "⬇️ Exportă statul de funcții salvat (Excel)",
+                            data=excel_bytes,
+                            file_name="stat_de_functii_salvat.xlsx",
+                            mime=(mimetypes.guess_type("stat_de_functii_salvat.xlsx")[0] or "application/octet-stream"),
+                            key="btn_export_stat_functii_salvat",
+                        )
+
+                        # Export Word/PDF
+                        try:
+                            from docx import Document as _DocxDoc
+                            doc_stat = _DocxDoc()
+                            doc_stat.add_heading("Stat de funcții", level=1)
+                            try:
+                                cfg = load_config()
+                            except Exception:
+                                cfg = {}
+                            unit_name = cfg.get("denumire_unitate", "")
+                            if unit_name:
+                                doc_stat.add_paragraph(f"Unitate: {unit_name}")
+                            table = doc_stat.add_table(rows=1, cols=len(edited_df.columns))
+                            hdr_cells = table.rows[0].cells
+                            for j, col_name in enumerate(edited_df.columns):
+                                hdr_cells[j].text = str(col_name)
+                            for _, row in edited_df.iterrows():
+                                row_cells = table.add_row().cells
+                                for j, col_name in enumerate(edited_df.columns):
+                                    val = row.get(col_name, "")
+                                    row_cells[j].text = "" if pd.isna(val) else str(val)
+                            buf_docx = BytesIO()
+                            doc_stat.save(buf_docx)
+                            buf_docx.seek(0)
+                            st.download_button(
+                                "⬇️ Exportă statul de funcții salvat (Word)",
+                                data=buf_docx.getvalue(),
+                                file_name="stat_de_functii_salvat.docx",
+                                mime=(mimetypes.guess_type("stat_de_functii_salvat.docx")[0] or "application/octet-stream"),
+                                key="btn_export_stat_functii_salvat_docx",
+                            )
+                            pdf_bytes = convert_docx_to_pdf_bytes(buf_docx.getvalue())
+                            if pdf_bytes:
+                                st.download_button(
+                                    "⬇️ Exportă statul de funcții salvat (PDF)",
+                                    data=pdf_bytes,
+                                    file_name="stat_de_functii_salvat.pdf",
+                                    mime="application/pdf",
+                                    key="btn_export_stat_functii_salvat_pdf",
+                                )
+                        except Exception:
+                            pass
+
+                        _stat_subtitle("Sincronizare cu lista de angajați")
+                        if st.button("🔄 Importă / actualizează angajații din statul de funcții", key="btn_sync_stat_to_emp"):
+                            # construim un index de angajați existenți după Marcă
+                            emp_df = list_employees(conn, active_only=False)
+                            existing_by_marca = {}
+                            if not emp_df.empty:
+                                for _, r_emp in emp_df.iterrows():
+                                    m = r_emp.get("marca") or r_emp.get("MARCA") or r_emp.get("Marca")
+                                    if m is not None:
+                                        existing_by_marca[str(m)] = r_emp
+
+                            inserate = 0
+                            actualizate = 0
+
+                            for _, r in edited_df.iterrows():
+                                marca = r.get("Marca")
+                                if pd.isna(marca) or not str(marca).strip():
+                                    continue
+                                marca_str = str(marca).strip()
+
+                                nume = r.get("Nume") or ""
+                                prenume = r.get("Prenume") or ""
+                                cnp = r.get("CNP") or ""
+                                functie = r.get("Functie") or ""
+                                loc_munca = r.get("Loc de munca") or ""
+
+                                if marca_str in existing_by_marca:
+                                    row_emp = existing_by_marca[marca_str]
+                                    emp_id = int(row_emp["id"])
+                                    data = {}
+                                    for col in [
+                                        "marca","last_name","first_name","cnp",
+                                        "functie","departament","activ"
+                                    ]:
+                                        data[col] = None
+                                    data["marca"] = marca_str
+                                    data["last_name"] = str(nume).strip()
+                                    data["first_name"] = str(prenume).strip()
+                                    data["cnp"] = str(cnp).strip()
+                                    data["functie"] = str(functie).strip()
+                                    data["departament"] = str(loc_munca).strip()
+                                    data["activ"] = 1
+                                    update_employee(conn, emp_id, data)
+                                    actualizate += 1
+                                else:
+                                    data = {}
+                                    for col in [
+                                        "marca",
+                                        "last_name",
+                                        "first_name",
+                                        "cnp",
+                                        "functie",
+                                        "departament",
+                                        "data_angajare",
+                                        "tip_contract",
+                                        "strada",
+                                        "numar",
+                                        "bloc",
+                                        "scara",
+                                        "apartament",
+                                        "cod_postal",
+                                        "localitate",
+                                        "judet",
+                                        "telefon_fix",
+                                        "mobil",
+                                        "email",
+                                        "ci_tip_act",
+                                        "ci_serie",
+                                        "ci_numar",
+                                        "ci_eliberat_de",
+                                        "ci_data_eliberarii",
+                                        "stare_civila",
+                                        "nr_copii",
+                                        "loc_munca",
+                                        "departament_organizatoric",
+                                        "functie_contract",
+                                        "tip_norma",
+                                        "program_munca",
+                                        "salariu_baza",
+                                        "studii",
+                                        "profesie",
+                                        "calificare",
+                                        "observatii",
+                                        "dosar_nr",
+                                        "dosar_functionar_public",
+                                        "dosar_data_intocmire",
+                                        "dosar_autoritate",
+                                        "dosar_intocmit_nume",
+                                        "dosar_intocmit_functie",
+                                        "dosar_intocmit_semnatura",
+                                        "dosar_modificari_nume",
+                                        "dosar_modificari_functie",
+                                        "dosar_modificari_semnatura",
+                                        "dosar_certificare_nume",
+                                        "dosar_certificare_functie",
+                                        "dosar_certificare_semnatura",
+                                        "activitate_in_afara_functiei",
+                                        "activitate_in_cadru_institutie",
+                                        "situatia_drepturi_salariale",
+                                        "situatia_concedii",
+                                        "situatia_disciplinara",
+                                        "registru_numar",
+                                        "registru_data",
+                                        "registru_observatii",
+                                        "activ",
+                                    ]:
+                                        data[col] = None
+                                    data["marca"] = marca_str
+                                    data["last_name"] = str(nume).strip()
+                                    data["first_name"] = str(prenume).strip()
+                                    data["cnp"] = str(cnp).strip()
+                                    data["functie"] = str(functie).strip()
+                                    data["departament"] = str(loc_munca).strip()
+                                    data["activ"] = 1
+                                    insert_employee(conn, data)
+                                    inserate += 1
+
+                            st.success(f"Sincronizare finalizată: {inserate} angajați noi, {actualizate} actualizați.")
+    # ---------------------------------------------------------
+        # TAB 2: IMPORT DIN EXCEL (MAPARE CÂMPURI)
+        # ---------------------------------------------------------
+        with tab_import:
+            st.markdown("### Stat de funcții completat (import din Excel)")
+
+            uploaded_file = st.file_uploader(
+                "Alege fișierul Excel cu datele pentru statul de funcții",
+                type=["xlsx"],
+                key="stat_functii_xlsx",
             )
 
-            # Export în Word/PDF
-            try:
-                from docx import Document as _DocxDoc
-                doc_stat = _DocxDoc()
-                doc_stat.add_heading("Stat de funcții", level=1)
+            if uploaded_file is not None:
                 try:
-                    cfg = load_config()
-                except Exception:
-                    cfg = {}
-                unit_name = cfg.get("denumire_unitate", "")
-                if unit_name:
-                    doc_stat.add_paragraph(f"Unitate: {unit_name}")
-                table = doc_stat.add_table(rows=1, cols=len(edited_df.columns))
-                hdr_cells = table.rows[0].cells
-                for j, col_name in enumerate(edited_df.columns):
-                    hdr_cells[j].text = str(col_name)
-                for _, row in edited_df.iterrows():
-                    row_cells = table.add_row().cells
-                    for j, col_name in enumerate(edited_df.columns):
-                        val = row.get(col_name, "")
-                        row_cells[j].text = "" if pd.isna(val) else str(val)
-                buf_docx = BytesIO()
-                doc_stat.save(buf_docx)
-                buf_docx.seek(0)
-                st.download_button(
-                    "⬇️ Exportă statul de funcții salvat (Word)",
-                    data=buf_docx.getvalue(),
-                    file_name="stat_de_functii_salvat.docx",
-                    mime=(mimetypes.guess_type("stat_de_functii_salvat.docx")[0] or "application/octet-stream"),
-                    key="btn_export_stat_functii_salvat_docx",
-                )
-                pdf_bytes = convert_docx_to_pdf_bytes(buf_docx.getvalue())
-                if pdf_bytes:
-                    st.download_button(
-                        "⬇️ Exportă statul de funcții salvat (PDF)",
-                        data=pdf_bytes,
-                        file_name="stat_de_functii_salvat.pdf",
-                        mime="application/pdf",
-                        key="btn_export_stat_functii_salvat_pdf",
-                    )
-            except Exception:
-                pass
+                    df_src = pd.read_excel(uploaded_file)
+                except Exception as e:
+                    st.error(f"Eroare la citirea fișierului Excel: {e}")
+                    return
 
-            st.markdown("#### Sincronizare cu lista de angajați (employees)")
-            if st.button("🔄 Importă / actualizează employees din statul de funcții", key="btn_sync_stat_to_emp"):
-                # construim un index de angajați existenți după Marcă
-                emp_df = list_employees(conn, active_only=False)
-                existing_by_marca = {}
-                if not emp_df.empty:
-                    for _, r_emp in emp_df.iterrows():
-                        m = r_emp.get("marca") or r_emp.get("MARCA") or r_emp.get("Marca")
-                        if m is not None:
-                            existing_by_marca[str(m)] = r_emp
+                st.markdown("#### Previzualizare fișier Excel")
+                st.dataframe(df_src.head(), use_container_width=True)
 
-                inserate = 0
-                actualizate = 0
+                st.markdown("#### Mapare câmpuri către modelul de stat de funcții")
 
-                for _, r in edited_df.iterrows():
-                    marca = r.get("Marca")
-                    if pd.isna(marca) or not str(marca).strip():
-                        continue
-                    marca_str = str(marca).strip()
+                campuri_tinta = [
+                    "Marca",
+                    "CNP",
+                    "Nume",
+                    "Prenume",
+                    "Loc de munca",
+                    "Stare contract",
+                    "Tip angajat",
+                    "Tip raport",
+                    "Cod COR",
+                    "Functie",
+                    "Alta functie",
+                    "Explicatie alta functie",
+                    "Studii",
+                    "Gradatie",
+                    "Grad",
+                    "Vechime(ani)",
+                    "Norma",
+                    "Salariu de incadrare",
+                    "Norme salariu",
+                    "Data angajarii",
+                    "Data incetarii",
+                ]
 
-                    nume = r.get("Nume") or ""
-                    prenume = r.get("Prenume") or ""
-                    cnp = r.get("CNP") or ""
-                    functie = r.get("Functie") or ""
-                    loc_munca = r.get("Loc de munca") or ""
+                col_options = ["(nu completa)"] + list(df_src.columns)
+                mapping = {}
 
-                    if marca_str in existing_by_marca:
-                        row_emp = existing_by_marca[marca_str]
-                        emp_id = int(row_emp["id"])
-                        data = {}
-                        for col in [
-                            "marca","last_name","first_name","cnp",
-                            "functie","departament","activ"
-                        ]:
-                            data[col] = None
-                        data["marca"] = marca_str
-                        data["last_name"] = str(nume).strip()
-                        data["first_name"] = str(prenume).strip()
-                        data["cnp"] = str(cnp).strip()
-                        data["functie"] = str(functie).strip()
-                        data["departament"] = str(loc_munca).strip()
-                        data["activ"] = 1
-                        update_employee(conn, emp_id, data)
-                        actualizate += 1
-                    else:
-                        data = {}
-                        for col in [
-                            "marca",
-                            "last_name",
-                            "first_name",
-                            "cnp",
-                            "functie",
-                            "departament",
-                            "data_angajare",
-                            "tip_contract",
-                            "strada",
-                            "numar",
-                            "bloc",
-                            "scara",
-                            "apartament",
-                            "cod_postal",
-                            "localitate",
-                            "judet",
-                            "telefon_fix",
-                            "mobil",
-                            "email",
-                            "ci_tip_act",
-                            "ci_serie",
-                            "ci_numar",
-                            "ci_eliberat_de",
-                            "ci_data_eliberarii",
-                            "stare_civila",
-                            "nr_copii",
-                            "loc_munca",
-                            "departament_organizatoric",
-                            "functie_contract",
-                            "tip_norma",
-                            "program_munca",
-                            "salariu_baza",
-                            "studii",
-                            "profesie",
-                            "calificare",
-                            "observatii",
-                            "dosar_nr",
-                            "dosar_functionar_public",
-                            "dosar_data_intocmire",
-                            "dosar_autoritate",
-                            "dosar_intocmit_nume",
-                            "dosar_intocmit_functie",
-                            "dosar_intocmit_semnatura",
-                            "dosar_modificari_nume",
-                            "dosar_modificari_functie",
-                            "dosar_modificari_semnatura",
-                            "dosar_certificare_nume",
-                            "dosar_certificare_functie",
-                            "dosar_certificare_semnatura",
-                            "activitate_in_afara_functiei",
-                            "activitate_in_cadru_institutie",
-                            "situatia_drepturi_salariale",
-                            "situatia_concedii",
-                            "situatia_disciplinara",
-                            "registru_numar",
-                            "registru_data",
-                            "registru_observatii",
-                            "activ",
-                        ]:
-                            data[col] = None
-                        data["marca"] = marca_str
-                        data["last_name"] = str(nume).strip()
-                        data["first_name"] = str(prenume).strip()
-                        data["cnp"] = str(cnp).strip()
-                        data["functie"] = str(functie).strip()
-                        data["departament"] = str(loc_munca).strip()
-                        data["activ"] = 1
-                        insert_employee(conn, data)
-                        inserate += 1
-
-                st.success(f"Sincronizare finalizată: {inserate} angajați noi, {actualizate} actualizați.")
-# ---------------------------------------------------------
-    # TAB 2: IMPORT DIN EXCEL (MAPARE CÂMPURI)
-    # ---------------------------------------------------------
-    with tab_import:
-        st.markdown("### Stat de funcții completat (import din Excel)")
-
-        uploaded_file = st.file_uploader(
-            "Alege fișierul Excel cu datele pentru statul de funcții",
-            type=["xlsx"],
-            key="stat_functii_xlsx",
-        )
-
-        if uploaded_file is not None:
-            try:
-                df_src = pd.read_excel(uploaded_file)
-            except Exception as e:
-                st.error(f"Eroare la citirea fișierului Excel: {e}")
-                return
-
-            st.markdown("#### Previzualizare fișier Excel")
-            st.dataframe(df_src.head(), use_container_width=True)
-
-            st.markdown("#### Mapare câmpuri către modelul de stat de funcții")
-
-            campuri_tinta = [
-                "Marca",
-                "CNP",
-                "Nume",
-                "Prenume",
-                "Loc de munca",
-                "Stare contract",
-                "Tip angajat",
-                "Tip raport",
-                "Cod COR",
-                "Functie",
-                "Alta functie",
-                "Explicatie alta functie",
-                "Studii",
-                "Gradatie",
-                "Grad",
-                "Vechime(ani)",
-                "Norma",
-                "Salariu de incadrare",
-                "Norme salariu",
-                "Data angajarii",
-                "Data incetarii",
-            ]
-
-            col_options = ["(nu completa)"] + list(df_src.columns)
-            mapping = {}
-
-            for target in campuri_tinta:
-                mapping[target] = st.selectbox(
-                    f"Coloană pentru „{target}”",
-                    options=col_options,
-                    key=f"map_stat_{target.replace(' ', '_').replace('(', '').replace(')', '').replace('.', '')}",
-                )
-
-            if st.button("Generează și salvează stat de funcții din Excel"):
-                n = len(df_src)
-                out = {}
                 for target in campuri_tinta:
-                    src_col = mapping.get(target)
-                    if src_col and src_col != "(nu completa)" and src_col in df_src.columns:
-                        out[target] = df_src[src_col]
+                    mapping[target] = st.selectbox(
+                        f"Coloană pentru „{target}”",
+                        options=col_options,
+                        key=f"map_stat_{target.replace(' ', '_').replace('(', '').replace(')', '').replace('.', '')}",
+                    )
+
+                if st.button("Generează și salvează stat de funcții din Excel"):
+                    n = len(df_src)
+                    out = {}
+                    for target in campuri_tinta:
+                        src_col = mapping.get(target)
+                        if src_col and src_col != "(nu completa)" and src_col in df_src.columns:
+                            out[target] = df_src[src_col]
+                        else:
+                            out[target] = [""] * n
+
+                    df_stat_xlsx = pd.DataFrame(out)
+
+                    # Afișăm rezultatul
+                    st.markdown("#### Stat de funcții completat (din Excel)")
+                    st.dataframe(df_stat_xlsx, use_container_width=True)
+
+                    # Salvăm în baza de date pentru utilizare ulterioară
+                    df_stat_xlsx.to_sql("stat_functii", conn, if_exists="replace", index=False)
+                    st.success(
+                        "Statul de funcții a fost generat din Excel și salvat în baza de date. "
+                        "Îl poți edita în tab-ul „Administrare stat de funcții”."
+                    )
+
+                    excel_bytes = _df_to_xlsx_bytes(df_stat_xlsx, sheet_name="Stat_de_functii")
+                    if excel_bytes is None:
+                        # Fallback CSV (nu necesită openpyxl/xlsxwriter)
+                        excel_bytes = df_stat_xlsx.to_csv(index=False).encode("utf-8")
+                        mime = "text/csv"
+                        fname = "stat_de_functii_completat_import.csv"
                     else:
-                        out[target] = [""] * n
+                        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        fname = "stat_de_functii_completat_import.xlsx"
 
-                df_stat_xlsx = pd.DataFrame(out)
-
-                # Afișăm rezultatul
-                st.markdown("#### Stat de funcții completat (din Excel)")
-                st.dataframe(df_stat_xlsx, use_container_width=True)
-
-                # Salvăm în baza de date pentru utilizare ulterioară
-                df_stat_xlsx.to_sql("stat_functii", conn, if_exists="replace", index=False)
-                st.success(
-                    "Statul de funcții a fost generat din Excel și salvat în baza de date. "
-                    "Îl poți edita în tab-ul „Stat de funcții salvat”."
-                )
-
-                excel_bytes = _df_to_xlsx_bytes(df_stat_xlsx, sheet_name="Stat_de_functii")
-                if excel_bytes is None:
-                    # Fallback CSV (nu necesită openpyxl/xlsxwriter)
-                    excel_bytes = df_stat_xlsx.to_csv(index=False).encode("utf-8")
-                    mime = "text/csv"
-                    fname = "stat_de_functii_completat_import.csv"
-                else:
-                    mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    fname = "stat_de_functii_completat_import.xlsx"
-
-                st.download_button(
-                    "⬇️ Exportă statul de funcții completat (din Excel)",
-                    data=excel_bytes,
-                    file_name=fname,
-                    mime=(mimetypes.guess_type(fname)[0] or "application/octet-stream"),
-                    key="btn_export_stat_functii_completat_xlsx",
-                )
+                    st.download_button(
+                        "⬇️ Exportă statul de funcții completat (din Excel)",
+                        data=excel_bytes,
+                        file_name=fname,
+                        mime=(mimetypes.guess_type(fname)[0] or "application/octet-stream"),
+                        key="btn_export_stat_functii_completat_xlsx",
+                    )
 
 
 
@@ -17510,18 +18658,46 @@ def page_centralizator_concedii(conn: sqlite3.Connection):
     """Centralizator concedii bazat pe pontaj (CO/CM/CFP/FS/ALTA)."""
     ensure_pontaj_tables(conn)
     st.markdown('<h2 class="page-title">Centralizator concedii</h2>', unsafe_allow_html=True)
+    with st.container(key="centr_page_shell"):
+        st.markdown(
+            """
+            <style>
+            /* Centralizator: butoane la stânga, stivuite, fără alb */
+            .st-key-centr_page_shell [data-testid="stButton"] > button,
+            .st-key-centr_page_shell [data-testid="stDownloadButton"] > button,
+            .st-key-centr_page_shell div[data-testid="stDownloadButton"] > button,
+            .st-key-centr_page_shell .stDownloadButton > button{
+              width: 260px !important;
+              min-width: 260px !important;
+              max-width: 260px !important;
+              min-height: 38px !important;
+              height: 38px !important;
+              margin-left: 0 !important;
+              margin-right: 0 !important;
+              display: block !important;
+            }
+            .st-key-centr_btn_stack [data-testid="stDownloadButton"],
+            .st-key-centr_btn_stack [data-testid="stButton"]{
+              margin-top: 8px !important;
+            }
+            .st-key-centr_btn_stack [data-testid="stDownloadButton"]:first-of-type,
+            .st-key-centr_btn_stack [data-testid="stButton"]:first-of-type{
+              margin-top: 0 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    col_y, col_m = st.columns(2)
-    with col_y:
-        year = st.number_input(
+        # Fără steppere albe (-/+): folosim dropdown-uri, aliniate la stânga, una sub alta.
+        _y_now = int(pd.Timestamp.today().year)
+        _year_opts = list(range(1990, _y_now + 2))
+        year = st.selectbox(
             "An",
-            min_value=2000,
-            max_value=2100,
-            value=pd.Timestamp.today().year,
-            step=1,
+            options=_year_opts,
+            index=_year_opts.index(int(st.session_state.get("centr_year", _y_now))),
             key="centr_year",
         )
-    with col_m:
         opt_luna = st.selectbox(
             "Lună",
             options=["Tot anul"] + [str(m) for m in range(1, 13)],
@@ -17642,13 +18818,14 @@ def page_centralizator_concedii(conn: sqlite3.Connection):
             nume_fisier += f"_{int(opt_luna):02d}"
         nume_fisier += ".xlsx"
 
-    st.download_button(
-        "⬇️ Exportă centralizator concedii",
-        data=excel_bytes,
-        file_name=nume_fisier,
-        mime=(mimetypes.guess_type(nume_fisier)[0] or "application/octet-stream"),
-        key="btn_export_centralizator_concedii",
-    )
+    with st.container(key="centr_btn_stack"):
+        st.download_button(
+            "⬇️ Exportă centralizator concedii",
+            data=excel_bytes,
+            file_name=nume_fisier,
+            mime=(mimetypes.guess_type(nume_fisier)[0] or "application/octet-stream"),
+            key="btn_export_centralizator_concedii",
+        )
 
     
 
@@ -17681,7 +18858,7 @@ def page_centralizator_concedii(conn: sqlite3.Connection):
             data=buf_docx.getvalue(),
             file_name=f"centralizator_concedii_{int(year)}.docx",
             mime=(mimetypes.guess_type(f"centralizator_concedii_{int(year)}.docx")[0] or "application/octet-stream"),
-                key="centr_export_docx",
+            key="centr_export_docx",
         )
         pdf_bytes = convert_docx_to_pdf_bytes(buf_docx.getvalue())
         if pdf_bytes:
@@ -17698,28 +18875,137 @@ def page_centralizator_concedii(conn: sqlite3.Connection):
 # -------------------------------------------------------------
 # PONTAJ
 # -------------------------------------------------------------
-def page_pontaj(conn: sqlite3.Connection):
-    """Modulul de pontaj angajați, legat de Statul de funcții și Centralizator concedii."""
+def page_pontaj(conn: sqlite3.Connection, cfg: dict | None = None):
+    """Pontaj angajați (copie locală): sincronizare + vizualizare + export (read-only)."""
     ensure_pontaj_tables(conn)
-    st.markdown('<h2 class="page-title">Pontaj angajați</h2>', unsafe_allow_html=True)
 
-    col_y, col_m = st.columns(2)
-    with col_y:
-        year = st.number_input(
+    st.markdown(
+        '<span id="pontaj-scope" style="display:none" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="pontaj_page_shell"):
+        st.markdown('<h2 class="page-title">Verificare pontaj angajați</h2>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <style>
+            /* Pontaj angajați: layout vertical, text mai mic, totul la stânga */
+            /* Lărgim pagina doar în Pontaj (pentru tabel full-width) */
+            section.main:has(#pontaj-scope) .block-container{
+              max-width: 100% !important;
+            }
+            /* Înjumatățire layout: toate secțiunile la 50%, ancorate stânga */
+            .st-key-pontaj_page_shell{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 360px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-pontaj_page_shell h2.page-title{ font-size: 20px !important; }
+            .st-key-pontaj_page_shell h2.page-title::after{
+              content: "" !important;
+              display: block !important;
+              height: 1px !important;
+              width: min(520px, 100%) !important;
+              margin-top: 10px !important;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.22) 55%,
+                rgba(148,163,184,0.02) 100%
+              ) !important;
+            }
+            .st-key-pontaj_page_shell .stMarkdown h3,
+            .st-key-pontaj_page_shell h3{
+              font-size: 0.94rem !important;
+              font-weight: 860 !important;
+              letter-spacing: 0.01em !important;
+              margin-bottom: 10px !important;
+              padding-bottom: 8px !important;
+              position: relative !important;
+            }
+            .st-key-pontaj_page_shell .stMarkdown h3::after,
+            .st-key-pontaj_page_shell h3::after{
+              content: "" !important;
+              display: block !important;
+              height: 1px !important;
+              width: min(520px, 100%) !important;
+              margin-top: 8px !important;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.22) 55%,
+                rgba(148,163,184,0.02) 100%
+              ) !important;
+            }
+            .st-key-pontaj_page_shell p,
+            .st-key-pontaj_page_shell label,
+            .st-key-pontaj_page_shell .stCaption{
+              font-size: 0.85rem !important;
+            }
+            .st-key-pontaj_page_shell [data-testid="stVerticalBlock"]{ gap: 0.35rem !important; }
+            .st-key-pontaj_page_shell [data-testid="stButton"] > button{
+              min-height: 38px !important;
+              height: 38px !important;
+              padding: 0 14px !important;
+              font-size: 0.88rem !important;
+              font-weight: 800 !important;
+              margin-left: 0 !important;
+              margin-right: 0 !important;
+            }
+            /* Butoane pe lățimea secțiunii (coerent cu layout-ul înjumătățit) */
+            .st-key-pontaj_page_shell [data-testid="stButton"] > button,
+            .st-key-pontaj_page_shell [data-testid="stDownloadButton"] > button{
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            /* Butoane acțiuni (Pontaj sincronizat): ca în Angajați (260x38) */
+            .st-key-pontaj_actions [data-testid="stButton"] > button,
+            .st-key-pontaj_controls div[data-testid="stDownloadButton"] > button,
+            .st-key-pontaj_controls [data-testid="stDownloadButton"] > button,
+            .st-key-pontaj_controls .stDownloadButton > button{
+              width: 260px !important;
+              min-width: 260px !important;
+              max-width: 260px !important;
+              min-height: 38px !important;
+              height: 38px !important;
+              margin-left: 0 !important;
+              margin-right: 0 !important;
+              display: block !important;
+            }
+            /* Selectbox "Alege angajatul": text alb și capsulă pe lățimea secțiunii */
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"],
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] > div,
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] div[data-baseweb="select"],
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] div[data-baseweb="select"] > div{
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] div[data-baseweb="select"] *,
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+            .st-key-pontaj_page_shell [data-testid="stSelectbox"] div[data-baseweb="select"] div{
+              color: rgba(248,250,252,0.96) !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # UI: fără steppere albe (-/+). Folosim dropdown-uri premium.
+        _y_now = int(pd.Timestamp.today().year)
+        _m_now = int(pd.Timestamp.today().month)
+        _year_opts = list(range(1990, _y_now + 2))
+        year = st.selectbox(
             "An",
-            min_value=2000,
-            max_value=2100,
-            value=pd.Timestamp.today().year,
-            step=1,
+            options=_year_opts,
+            index=_year_opts.index(int(st.session_state.get("pontaj_year", _y_now))),
             key="pontaj_year",
         )
-    with col_m:
-        month = st.number_input(
+        month = st.selectbox(
             "Lună",
-            min_value=1,
-            max_value=12,
-            value=pd.Timestamp.today().month,
-            step=1,
+            options=list(range(1, 13)),
+            index=int(st.session_state.get("pontaj_month", _m_now)) - 1,
             key="pontaj_month",
         )
 
@@ -17728,13 +19014,12 @@ def page_pontaj(conn: sqlite3.Connection):
 
     st.markdown(f"**Perioadă pontaj:** {period_start.date()} - {period_end.date()}")
 
-    st.markdown("### Adaugă pontaj pentru un angajat")
-
     emp_df = list_employees(conn, active_only=True)
     if emp_df.empty:
         st.info("Nu există angajați activi în baza de date.")
         return
 
+    # Filtre: Angajat (pentru vizualizare/export)
     recs = emp_df.to_dict("records")
     idx_emp = st.selectbox(
         "Alege angajatul",
@@ -17771,56 +19056,11 @@ def page_pontaj(conn: sqlite3.Connection):
         except Exception:
             pass
 
-    # Formular pontaj
-    col_d, col_ore, col_tip = st.columns(3)
-    with col_d:
-        import datetime as _dt_pontaj
-        _today_p = _dt_pontaj.date.today()
-        _min_p = _today_p.replace(year=_today_p.year - 100)
-        _max_p = _today_p.replace(year=_today_p.year + 10)
-        data_p = st.date_input(
-            "Data",
-            value=period_start.date(),
-            min_value=_min_p,
-            max_value=_max_p,
-            key="pontaj_data",
-        )
-    with col_ore:
-        ore_lucru = st.number_input(
-            "Ore lucrate",
-            min_value=0.0,
-            max_value=24.0,
-            step=0.5,
-            value=8.0,
-            key="pontaj_ore",
-        )
-    with col_tip:
-        tip_zi = st.selectbox(
-            "Tip zi",
-            options=["LUCRU", "CO", "CM", "CFP", "FS", "ALTA"],
-            index=0,
-            key="pontaj_tip_zi",
-        )
+        st.markdown("### Pontaj sincronizat (copie locală)")
 
-    observatii = st.text_input(
-        "Observații (opțional)",
-        key="pontaj_observatii",
-    )
-
-    if st.button("💾 Adaugă în pontaj", key="pontaj_btn_add"):
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO pontaj (employee_id, data, ore_lucru, tip_zi, observatii)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (int(emp_id), str(data_p), float(ore_lucru), tip_zi, observatii.strip() or None),
-        )
-        conn.commit()
-        st.success("Înregistrarea de pontaj a fost salvată.")
-
-    st.markdown("---")
-    st.markdown("### Pontajul lunii curente (editabil)")
+        # Config (folosit pentru sincronizare externă)
+        cfg = cfg or {}
+        pontaj_url = str(cfg.get("pontaj_url") or "").strip()
 
     cur = conn.cursor()
     cur.execute(
@@ -17836,89 +19076,37 @@ def page_pontaj(conn: sqlite3.Connection):
             e.first_name
         FROM pontaj p
         LEFT JOIN employees e ON e.id = p.employee_id
-        WHERE date(p.data) BETWEEN date(?) AND date(?)
+        WHERE p.employee_id = ?
+          AND date(p.data) BETWEEN date(?) AND date(?)
         ORDER BY p.data, e.last_name, e.first_name
         """,
-        (str(period_start.date()), str(period_end.date())),
+        (int(emp_id), str(period_start.date()), str(period_end.date())),
     )
     rows = cur.fetchall()
     if not rows:
-        st.info("Nu există pontaj în perioada selectată.")
-        return
-
-    df_p = pd.DataFrame(rows, columns=rows[0].keys())
-
-    edited_df = st.data_editor(
-        df_p,
-        use_container_width=True,
-        num_rows="dynamic",
-        key="pontaj_editor",
-    )
-
-    if st.button("💾 Salvează modificările de pontaj", key="pontaj_btn_save_all"):
-        # rescriem tabela pontaj pentru perioada aleasă
-        cur = conn.cursor()
-        cur.execute(
-            "DELETE FROM pontaj WHERE date(data) BETWEEN date(?) AND date(?)",
-            (str(period_start.date()), str(period_end.date())),
+        df_p = pd.DataFrame(
+            columns=[
+                "data",
+                "ore_lucru",
+                "tip_zi",
+                "observatii",
+                "marca",
+                "last_name",
+                "first_name",
+            ]
         )
-        conn.commit()
+    else:
+        df_p = pd.DataFrame(rows, columns=rows[0].keys())
 
-        for _, r in edited_df.iterrows():
-            try:
-                emp_marca = r.get("marca") or r.get("Marca") or r.get("MARCA")
-                emp_id_row = None
-                if emp_marca:
-                    cur.execute(
-                        "SELECT id FROM employees WHERE marca = ? OR MARCA = ?",
-                        (str(emp_marca), str(emp_marca)),
-                    )
-                    found = cur.fetchone()
-                    if found:
-                        emp_id_row = found[0]
+    # Controale (aceeași coloană/flux vizual, dimensiuni identice)
+    with st.container(key="pontaj_controls"):
+        with st.container(key="pontaj_actions"):
+            do_sync = st.button("Sincronizează pontajul", key="pontaj_btn_sync")
+            do_refresh = st.button("Reîmprospătează", key="pontaj_btn_refresh")
 
-                if not emp_id_row:
-                    # fallback: dacă nu găsim după marcă, lăsăm employee_id None
-                    # (sau poți ignora rândul)
-                    continue
-
-                cur.execute(
-                    """
-                    INSERT INTO pontaj (employee_id, data, ore_lucru, tip_zi, observatii)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        int(emp_id_row),
-                        str(r["data"]),
-                        float(r.get("ore_lucru", 0) or 0),
-                        str(r.get("tip_zi") or ""),
-                        str(r.get("observatii") or "") or None,
-                    ),
-                )
-            except Exception:
-                continue
-        conn.commit()
-        st.success("Pontajul a fost rescris pentru perioada selectată.")
-
-    st.markdown("#### Operațiuni suplimentare")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button(
-            "🗑️ Șterge TOT pontajul pentru luna selectată",
-            key="pontaj_btn_del_month",
-        ):
-            cur = conn.cursor()
-            cur.execute(
-                "DELETE FROM pontaj WHERE date(data) BETWEEN date(?) AND date(?)",
-                (str(period_start.date()), str(period_end.date())),
-            )
-            conn.commit()
-            st.success("Pontajul pentru luna selectată a fost șters.")
-    with col_b:
-        excel_bytes = _df_to_xlsx_bytes(edited_df, sheet_name="Pontaj")
+        excel_bytes = _df_to_xlsx_bytes(df_p, sheet_name="Pontaj")
         if excel_bytes is None:
-            # Fallback CSV (nu necesită openpyxl/xlsxwriter)
-            excel_bytes = edited_df.to_csv(index=False).encode("utf-8")
+            excel_bytes = df_p.to_csv(index=False).encode("utf-8")
             mime = "text/csv"
             fname = f"pontaj_{int(year)}_{int(month):02d}.csv"
         else:
@@ -17933,6 +19121,91 @@ def page_pontaj(conn: sqlite3.Connection):
             key="pontaj_btn_export",
         )
 
+    if do_refresh:
+        st.rerun()
+
+    if do_sync:
+        # Best-effort: structurăm fluxul de import; integrarea externă poate fi conectată ulterior.
+        if not pontaj_url:
+            st.warning(
+                "Adresa modulului Pontaj nu este configurată. (Poți seta URL-ul din Configurare → Pontaj.)"
+            )
+        else:
+            try:
+                import requests  # type: ignore
+
+                params = {"year": int(year), "month": int(month), "employee_id": int(emp_id)}
+                url = pontaj_url.rstrip("/") + "/api/pontaj"
+                r = requests.get(url, params=params, timeout=15)
+                r.raise_for_status()
+                payload = r.json()
+                rows_ext = payload.get("rows") if isinstance(payload, dict) else payload
+                if not rows_ext:
+                    st.info("Nu au fost găsite date de importat pentru perioada selectată.")
+                else:
+                    df_ext = pd.DataFrame(rows_ext)
+                    if "data" not in df_ext.columns:
+                        st.warning("Format neașteptat de la modulul Pontaj (lipsește coloana `data`).")
+                    else:
+                        cur = conn.cursor()
+                        cur.execute(
+                            "DELETE FROM pontaj WHERE employee_id = ? AND date(data) BETWEEN date(?) AND date(?)",
+                            (int(emp_id), str(period_start.date()), str(period_end.date())),
+                        )
+                        conn.commit()
+                        ins = 0
+                        for _, rr in df_ext.iterrows():
+                            try:
+                                cur.execute(
+                                    """
+                                    INSERT INTO pontaj (employee_id, data, ore_lucru, tip_zi, observatii)
+                                    VALUES (?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        int(emp_id),
+                                        str(rr.get("data")),
+                                        float(rr.get("ore_lucru", 0) or 0),
+                                        str(rr.get("tip_zi") or ""),
+                                        (str(rr.get("observatii") or "") or None),
+                                    ),
+                                )
+                                ins += 1
+                            except Exception:
+                                continue
+                        conn.commit()
+                        st.success(f"Sincronizare finalizată: {ins} înregistrări importate.")
+                        st.rerun()
+            except Exception as e:
+                st.warning(f"Sincronizarea nu este disponibilă în acest moment. ({e})")
+
+    # Tabelul: full width (stânga-dreapta), independent de layout-ul înjumătățit
+    with st.container(key="pontaj_table_full"):
+        st.markdown(
+            """
+            <style>
+            .st-key-pontaj_table_full{
+              width: 100% !important;
+              max-width: 100% !important;
+              margin-left: 0 !important;
+              margin-right: 0 !important;
+            }
+            .st-key-pontaj_table_full [data-testid="stDataFrame"],
+            .st-key-pontaj_table_full [data-testid="stDataFrame"] > div{
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        if df_p.empty:
+            st.info("Nu există pontaj sincronizat în perioada selectată pentru angajatul ales.")
+        st.dataframe(
+            df_p,
+            use_container_width=True,
+            hide_index=True,
+        )
+
 
 # -------------------------------------------------------------
 # MAIN
@@ -17942,18 +19215,178 @@ def page_pontaj_hub(conn, cfg: dict):
     """Hub Pontaj: include aplicația Pontaj separată + centralizator concedii (în același tab)."""
     st.markdown('<h2 class="page-title">Pontaj</h2>', unsafe_allow_html=True)
     pontaj_url_default = cfg.get("pontaj_url") or "http://localhost:8502"
-    with st.expander("🔗 Deschide aplicația Pontaj (modul separat)", expanded=True):
-        st.info("Pontajul rulează ca aplicație separată (modul independent) pe același server, dar pe alt port.")
-        pontaj_url = st.text_input("URL Pontaj", value=pontaj_url_default, key="pontaj_url_inline")
-        st.markdown(f"👉 Deschide Pontaj: {pontaj_url}")
-        st.link_button("🚀 Deschide Pontaj", pontaj_url)
-        st.caption("Dacă nu se deschide, verifică firewall/port (ex: 8502) și că serviciul pontaj.rulează.")
-    st.markdown("---")
-    sub = st.radio("Alege în Pontaj", ["📌 Centralizator concedii", "⏱️ Pontaj (în Socrates – opțional)"], index=0, key="pontaj_hub_choice")
-    if sub.startswith("📌"):
+
+    # Layout/typography: aceleași setări ca în „Pontaj angajați” (50% stânga, text mai mic, linii fine)
+    st.markdown(
+        """
+        <style>
+        .st-key-pontaj_hub_shell{
+          width: 100% !important;
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        .st-key-pontaj_hub_shell h2.page-title{ font-size: 22px !important; }
+        .st-key-pontaj_hub_shell h2.page-title::after{
+          content: "" !important;
+          display: block !important;
+          height: 1px !important;
+          width: min(520px, 100%) !important;
+          margin-top: 10px !important;
+          background: linear-gradient(
+            90deg,
+            rgba(148,163,184,0.46) 0%,
+            rgba(148,163,184,0.22) 55%,
+            rgba(148,163,184,0.02) 100%
+          ) !important;
+        }
+        .st-key-pontaj_hub_shell .stMarkdown h3,
+        .st-key-pontaj_hub_shell h3{
+          font-size: 0.94rem !important;
+          font-weight: 860 !important;
+          letter-spacing: 0.01em !important;
+          margin-bottom: 10px !important;
+          padding-bottom: 8px !important;
+          position: relative !important;
+        }
+        .st-key-pontaj_hub_shell .stMarkdown h3::after,
+        .st-key-pontaj_hub_shell h3::after{
+          content: "" !important;
+          display: block !important;
+          height: 1px !important;
+          width: min(520px, 100%) !important;
+          margin-top: 8px !important;
+          background: linear-gradient(
+            90deg,
+            rgba(148,163,184,0.46) 0%,
+            rgba(148,163,184,0.22) 55%,
+            rgba(148,163,184,0.02) 100%
+          ) !important;
+        }
+        .st-key-pontaj_hub_shell p,
+        .st-key-pontaj_hub_shell label,
+        .st-key-pontaj_hub_shell .stCaption{
+          font-size: 0.85rem !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="pontaj_hub_shell"):
+        # Switch intern premium (înlocuiește radio): Pontaj | Centralizator concedii
+        st.markdown(
+            """
+            <style>
+            .st-key-pontaj_switch_box [data-testid="stTabs"] > div[role="tablist"]{
+              display:flex !important;
+              gap: 0 !important;
+              padding: 0 !important;
+              margin: 8px 0 16px 0 !important;
+              border-bottom: 1px solid rgba(148,163,184,0.28) !important;
+              justify-content: flex-start !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]{
+              min-height: 38px !important;
+              height: 38px !important;
+              padding: 0 14px !important;
+              border: none !important;
+              border-radius: 0 !important;
+              background: transparent !important;
+              color: rgba(226,232,240,0.88) !important;
+              font-weight: 800 !important;
+              letter-spacing: 0.01em !important;
+              box-shadow: none !important;
+              transition: color .18s ease, border-color .18s ease, background-color .18s ease !important;
+              border-bottom: 2px solid transparent !important;
+              margin: 0 !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:hover{
+              background: transparent !important;
+              color: rgba(248,250,252,0.94) !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:focus,
+            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:focus-visible{
+              background: transparent !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+              background: transparent !important;
+              color: rgba(248,250,252,0.98) !important;
+              border-bottom: 2px solid rgba(56,189,248,0.92) !important; /* bara albastră activă */
+              box-shadow: none !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] [data-baseweb="tab-border"]{
+              display:none !important;
+            }
+            .st-key-pontaj_switch_box [data-testid="stTabs"] [role="tabpanel"]{
+              padding-top: 8px !important;
+              border: 0 !important;
+              box-shadow: none !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.container(key="pontaj_switch_box"):
+            tab_pontaj, tab_centr = st.tabs(["Pontaj", "Centralizator concedii"])
+
+    with tab_pontaj:
+        # UI curat: pentru user obișnuit afișăm doar butonul + text scurt (ne-tehnic).
+        st.markdown(
+            """
+            <style>
+            .st-key-pontaj_open_block .stMarkdown h3{
+              font-size: 22px !important;   /* ca „Pontaj angajați” */
+              padding-bottom: 0 !important;
+              margin-bottom: 6px !important;
+            }
+            .st-key-pontaj_open_block .stMarkdown h3::after{
+              content: "" !important;
+              display: block !important;
+              height: 1px !important;
+              width: min(520px, 100%) !important;
+              margin-top: 10px !important;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.22) 55%,
+                rgba(148,163,184,0.02) 100%
+              ) !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(key="pontaj_open_block"):
+            st.markdown("### Deschide modulul Pontaj")
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.caption("Pontajul se deschide într-un modul separat, găzduit pe același server.")
+        st.link_button("Deschide modulul Pontaj", pontaj_url_default)
+        page_pontaj(conn, cfg)
+
+        # Setări avansate (doar admin): URL + ajutor tehnic, jos în pagină
+        try:
+            is_admin = str(st.session_state.get("user_role", "user")) == "admin"
+        except Exception:
+            is_admin = False
+
+        if is_admin:
+            st.markdown("---")
+            with st.expander("Setări avansate", expanded=False):
+                pontaj_url = st.text_input(
+                    "Adresă modul Pontaj",
+                    value=pontaj_url_default,
+                    key="pontaj_url_inline",
+                    help="Ex: http://server:8502",
+                )
+                st.caption("Dacă nu se deschide: verifică accesul la server și disponibilitatea serviciului Pontaj.")
+                st.caption(f"Adresă curentă: {pontaj_url}")
+
+    with tab_centr:
         page_centralizator_concedii(conn)
-    else:
-        page_pontaj(conn)
 
 
 def main():
@@ -18042,7 +19475,7 @@ def main():
         NAV,
         index=nav_index,
         key="sidebar_nav_pick",
-        label_visibility="collapsed",
+        label_visibility="visible",
     )
 
     # Păstrăm comportamentul existent: main_choice rămâne sursa adevărului.
@@ -18231,6 +19664,87 @@ def main():
               background: #0f172a;
               border: 1px dashed #2c445c;
               border-radius: 10px;
+            }
+            .upload-zone{
+              background: #132636;
+              border: 1px dashed #2c445c;
+              border-radius: 8px;
+              padding: 20px;
+            }
+            .st-key-cfg_sigla_upl{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stFileUploaderDropzone"]{
+              background: rgba(15,23,42,0.56) !important;
+              border: 1px dashed rgba(148,163,184,0.34) !important;
+              border-radius: 10px !important;
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stFileUploaderDropzone"]:hover{
+              border-color: rgba(56,189,248,0.58) !important;
+              background: rgba(30,41,59,0.70) !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stFileUploaderDropzone"] *{
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stFileUploaderDropzone"] svg{
+              color: rgba(148,163,184,0.96) !important;
+              fill: rgba(148,163,184,0.96) !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stBaseButton-secondary"]{
+              background: rgba(30,41,59,0.92) !important;
+              color: rgba(241,245,249,0.96) !important;
+              border: 1px solid rgba(148,163,184,0.34) !important;
+              border-radius: 9px !important;
+            }
+            .st-key-cfg_sigla_upl [data-testid="stBaseButton-secondary"]:hover{
+              background: rgba(51,65,85,0.96) !important;
+              border-color: rgba(56,189,248,0.58) !important;
+            }
+            .st-key-cfg_upl_cor,
+            .st-key-cfg_upl_153{
+              width: 50% !important;
+              max-width: 50% !important;
+              min-width: 320px !important;
+              margin-left: 0 !important;
+              margin-right: auto !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stFileUploaderDropzone"],
+            .st-key-cfg_upl_153 [data-testid="stFileUploaderDropzone"]{
+              background: rgba(15,23,42,0.56) !important;
+              border: 1px dashed rgba(148,163,184,0.34) !important;
+              border-radius: 10px !important;
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stFileUploaderDropzone"]:hover,
+            .st-key-cfg_upl_153 [data-testid="stFileUploaderDropzone"]:hover{
+              border-color: rgba(56,189,248,0.58) !important;
+              background: rgba(30,41,59,0.70) !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stFileUploaderDropzone"] *,
+            .st-key-cfg_upl_153 [data-testid="stFileUploaderDropzone"] *{
+              color: rgba(226,232,240,0.96) !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stFileUploaderDropzone"] svg,
+            .st-key-cfg_upl_153 [data-testid="stFileUploaderDropzone"] svg{
+              color: rgba(148,163,184,0.96) !important;
+              fill: rgba(148,163,184,0.96) !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stBaseButton-secondary"],
+            .st-key-cfg_upl_153 [data-testid="stBaseButton-secondary"]{
+              background: rgba(30,41,59,0.92) !important;
+              color: rgba(241,245,249,0.96) !important;
+              border: 1px solid rgba(148,163,184,0.34) !important;
+              border-radius: 9px !important;
+            }
+            .st-key-cfg_upl_cor [data-testid="stBaseButton-secondary"]:hover,
+            .st-key-cfg_upl_153 [data-testid="stBaseButton-secondary"]:hover{
+              background: rgba(51,65,85,0.96) !important;
+              border-color: rgba(56,189,248,0.58) !important;
             }
 
             section.main:has(#cfg-scope) .save-bar{
