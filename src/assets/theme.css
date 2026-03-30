@@ -307,169 +307,231 @@ div[data-baseweb="input"] input::placeholder{
   background: transparent !important;
 }
 
-/* ===== HOME ===== */
-.home-hero{
-  background: rgba(0,0,0,0.24);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 18px;
-  padding: 20px 22px;
-  box-shadow: 0 22px 50px rgba(0,0,0,0.40);
-  backdrop-filter: blur(12px);
-  animation: enter 520ms ease-out both;
+/* ===== HOME DASHBOARD (strict scoped) ===== */
+section.main:has(#dash-scope) .home-dashboard{
+  width: 100%;
+  max-width: 1240px;
 }
-
-.home-hero .title{
-  font-size: 1.6rem;
-  font-weight: 880;
+section.main:has(#dash-scope) .home-dashboard-header{
+  margin-bottom: 14px;
+}
+section.main:has(#dash-scope) .home-title{
+  font-size: 2rem;
+  font-weight: 840;
+  color: #f8fafc;
   letter-spacing: -0.01em;
+  margin-bottom: 2px;
 }
-.home-hero .brand-mark{
-  font-weight: 900;
-  letter-spacing: 0.02em;
-}
-.home-hero .subtitle{
-  margin-top: 8px;
-  color: rgba(255,255,255,0.64);
-  font-size: 0.98rem;
+section.main:has(#dash-scope) .home-subtitle{
+  color: #a7b4c7;
+  font-size: 0.96rem;
 }
 
-.home-grid-title{
-  margin-top: 4px;
-  margin-bottom: 16px;
-  font-size: 1.05rem;
-  font-weight: 760;
+section.main:has(#dash-scope) .home-kpi-card{
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.26);
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  box-shadow: 0 8px 20px rgba(2,6,23,0.24), inset 0 0 0 1px rgba(255,255,255,0.02);
+  padding: 13px 14px 12px 14px;
+  min-height: 106px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
-
-.home-card{
-  background: rgba(0,0,0,0.36);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 16px;
-  padding: 16px 18px;
-  transition: transform 170ms ease, border-color 170ms ease, background 170ms ease;
-}
-.home-card + .home-card{
-  margin-top: 14px;
-}
-
-section.main:has(#dash-scope) .home-card{
-  margin-bottom: 16px;
-}
-.home-card:hover{
-  transform: translateY(-4px);
-  border-color: rgba(255,255,255,0.22);
-  background: rgba(0,0,0,0.45);
-}
-
-.home-kpi{
-  background: rgba(0,0,0,0.26);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 14px;
-  padding: 12px 14px;
-}
-.home-kpi .kpi-label{ color: rgba(255,255,255,0.60); font-size: 0.85rem; }
-.home-kpi .kpi-value{ font-size: 1.1rem; font-weight: 800; margin-top: 2px; }
-
-/* Home: small continue card */
-.home-continue{
-  background: rgba(0,0,0,0.32);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 16px;
-  padding: 12px 14px;
-  transition: transform 170ms ease, border-color 170ms ease, background 170ms ease;
-}
-.home-continue:hover{
-  transform: translateY(-3px);
-  border-color: rgba(255,255,255,0.22);
-  background: rgba(0,0,0,0.42);
-}
-.home-continue .label{ color: rgba(255,255,255,0.62); font-size: 0.85rem; }
-.home-continue .value{ font-size: 1.0rem; font-weight: 780; margin-top: 2px; }
-
-/* Home: action chips */
-.home-actions{
-  display:flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-}
-.home-chip{
-  display:inline-block;
-  padding: 8px 10px;
+section.main:has(#dash-scope) .home-kpi-card::before{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.05);
-  color: rgba(255,255,255,0.90);
-  font-size: 0.88rem;
+  background: rgba(148,163,184,0.55);
 }
-
-/* Home: blocuri mari (Căutare rapidă / Acțiuni rapide / Istoric recent) */
-.home-section{
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 18px 50px rgba(0,0,0,0.65);
-  backdrop-filter: blur(14px);
-  margin-top: 10px;
+section.main:has(#dash-scope) .home-kpi-card:hover{
+  transform: translateY(-1px);
+  border-color: rgba(148,163,184,0.38);
+  box-shadow: 0 12px 24px rgba(2,6,23,0.30), inset 0 0 0 1px rgba(255,255,255,0.03);
 }
-
-/* Home – scurtături + căutare: spacing și aliniere coerente */
-section.main:has(#dash-scope) .home-shortcuts div[data-testid="stButton"]{
-  margin-top: 8px !important;
-  margin-bottom: 0 !important;
-}
-
-section.main:has(#dash-scope) .home-search > div[data-testid="stTextInput"]{
-  margin-top: 8px !important;
-  margin-bottom: 0 !important;
-}
-
-section.main:has(#dash-scope) .home-search > div[data-testid="column"]{
-  margin-top: 8px !important;
-}
-
-.home-card-title{
-  font-size: 1.02rem;
-  font-weight: 780;
-  letter-spacing: -0.01em;
-  margin-bottom: 6px;
-}
-.home-card-text{
-  font-size: 0.92rem;
-  color: rgba(226,232,240,0.88);
-}
-
-.home-section-title{
-  font-size: 0.98rem;
-  font-weight: 760;
-  letter-spacing: 0.04em;
+section.main:has(#dash-scope) .home-kpi-card .kpi-label{
   text-transform: uppercase;
-  color: rgba(226,232,240,0.94);
-  margin-bottom: 8px;
+  letter-spacing: 0.11em;
+  font-size: 0.7rem;
+  color: #8da0b8;
+  font-weight: 700;
 }
-.home-section-text{
-  font-size: 0.9rem;
-  color: rgba(226,232,240,0.80);
+section.main:has(#dash-scope) .home-kpi-card .kpi-value{
+  margin-top: 6px;
+  color: #f8fafc;
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 900;
+}
+section.main:has(#dash-scope) .home-kpi-card .kpi-meta{
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+section.main:has(#dash-scope) .text-blue{ color: #60a5fa; }
+section.main:has(#dash-scope) .text-green{ color: #34d399; }
+section.main:has(#dash-scope) .text-amber{ color: #fbbf24; }
+section.main:has(#dash-scope) .text-violet{ color: #a78bfa; }
+
+/* accent per KPI card */
+section.main:has(#dash-scope) [data-testid="column"]:nth-of-type(1) .home-kpi-card::before{ background: #38bdf8; }
+section.main:has(#dash-scope) [data-testid="column"]:nth-of-type(2) .home-kpi-card::before{ background: #10b981; }
+section.main:has(#dash-scope) [data-testid="column"]:nth-of-type(3) .home-kpi-card::before{ background: #f59e0b; }
+section.main:has(#dash-scope) [data-testid="column"]:nth-of-type(4) .home-kpi-card::before{ background: #8b5cf6; }
+
+section.main:has(#dash-scope) .home-main-panel,
+section.main:has(#dash-scope) .home-bottom-grid{
+  margin-top: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.24);
+  background: #0f172a;
+  box-shadow: 0 10px 24px rgba(2,6,23,0.18);
+  padding: 14px;
 }
 
-/* Home: câmpuri de căutare – capsulă dark, fără alb dedesubt */
-.home-section div[data-baseweb="input"]{
-  background: #0B1220 !important;
-  border: 1px solid #263244 !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
+section.main:has(#dash-scope) .home-panel-title{
+  font-size: 1.26rem;
+  font-weight: 820;
+  color: #f8fafc;
 }
-.home-section div[data-baseweb="input"] > div,
-.home-section div[data-baseweb="input"] *{
-  background: transparent !important;
-  box-shadow: none !important;
+section.main:has(#dash-scope) .home-panel-sub{
+  color: #9fb0c8;
+  font-size: 0.9rem;
 }
-.home-section .stTextInput input{
-  background: transparent !important;
-  color: #F8FAFC !important;
+
+section.main:has(#dash-scope) [data-testid="stButton"] > button{
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
 }
-.home-section .stTextInput input::placeholder{
-  color: #CBD5E1 !important;
+section.main:has(#dash-scope) [data-testid="stButton"] > button[kind="secondary"]{
+  background: #1b2434 !important;
+  border: 1px solid #334155 !important;
+  color: #dbe4f2 !important;
+}
+section.main:has(#dash-scope) [data-testid="stButton"] > button[kind="primary"]{
+  background: #2563eb !important;
+  border: 1px solid #3b82f6 !important;
+  color: #f8fafc !important;
+}
+section.main:has(#dash-scope) [data-testid="stButton"] > button:hover{
+  filter: brightness(1.05);
+}
+
+section.main:has(#dash-scope) [data-testid="stTextInput"] input,
+section.main:has(#dash-scope) [data-testid="stSelectbox"] div[data-baseweb="select"]{
+  background: #111827 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 10px !important;
+  color: #f8fafc !important;
+}
+
+section.main:has(#dash-scope) .home-table-wrap{
+  margin-top: 10px;
+  border: 1px solid #263244;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b1220;
+}
+section.main:has(#dash-scope) .home-table{
+  width: 100%;
+  border-collapse: collapse;
+}
+section.main:has(#dash-scope) .home-table thead th{
+  text-align: left;
+  padding: 11px 12px;
+  background: #111827;
+  border-bottom: 1px solid #263244;
+  color: #93a8c3;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+section.main:has(#dash-scope) .home-table tbody td{
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(38,50,68,0.7);
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+section.main:has(#dash-scope) .home-table tbody tr:hover td{
+  background: rgba(30,41,59,0.36);
+}
+section.main:has(#dash-scope) .home-empty{
+  text-align: center;
+  color: #93a8c3;
+  padding: 14px 10px !important;
+}
+
+section.main:has(#dash-scope) .home-status-badge{
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+section.main:has(#dash-scope) .home-status-badge.is-green{
+  color: #34d399;
+  background: rgba(16,185,129,0.14);
+  border-color: rgba(16,185,129,0.28);
+}
+section.main:has(#dash-scope) .home-status-badge.is-amber{
+  color: #fbbf24;
+  background: rgba(245,158,11,0.14);
+  border-color: rgba(245,158,11,0.28);
+}
+section.main:has(#dash-scope) .home-status-badge.is-gray{
+  color: #cbd5e1;
+  background: rgba(100,116,139,0.18);
+  border-color: rgba(100,116,139,0.34);
+}
+section.main:has(#dash-scope) .home-action-pill{
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  color: #c7d2fe;
+  background: rgba(37,99,235,0.14);
+  border: 1px solid rgba(59,130,246,0.28);
+}
+
+section.main:has(#dash-scope) .home-bottom-title{
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin-bottom: 10px;
+}
+section.main:has(#dash-scope) .home-activity-item{
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+section.main:has(#dash-scope) .home-dot{
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+section.main:has(#dash-scope) .dot-blue{ background:#60a5fa; }
+section.main:has(#dash-scope) .dot-green{ background:#34d399; }
+section.main:has(#dash-scope) .dot-amber{ background:#fbbf24; }
+section.main:has(#dash-scope) .dot-violet{ background:#a78bfa; }
+section.main:has(#dash-scope) .home-activity-text{
+  color: #dbe4f2;
+  font-size: 0.9rem;
+}
+section.main:has(#dash-scope) .home-activity-time{
+  color: #8da0b8;
+  font-size: 0.78rem;
 }
 
 /* ===== ORGANIGRAMĂ (scoped) ===== */
