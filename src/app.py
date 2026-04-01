@@ -7,7 +7,7 @@ import json
 import mimetypes
 import re
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
@@ -984,6 +984,22 @@ GLASS_ALWAYS_CSS = """
 [data-testid="stSidebar"] .stButton > button:hover{
   background: var(--glass-bg2) !important;
   border-color: var(--glass-accent) !important;
+}
+/* Sidebar button text force white (inclusiv span intern) */
+[data-testid="stSidebar"] .stButton > button,
+[data-testid="stSidebar"] .stButton > button span,
+[data-testid="stSidebar"] .stButton > button span span{
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+/* Sidebar collapse button/icon force white */
+div[data-testid="stSidebarCollapseButton"] button,
+div[data-testid="stSidebarCollapseButton"] button span,
+div[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"]{
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
 }
 
 /* Download buttons (Exportă) – glass, fără fundal alb */
@@ -3813,6 +3829,103 @@ def _dashboard_get_recent_activity(conn) -> list[dict]:
 def page_home(conn, cfg):
     apply_premium_theme()
 
+    # Popup rapid de pontaj direct pe Acasă
+    _username = str(st.session_state.get("username", "") or "").strip()
+    _role = str(st.session_state.get("user_role", "user") or "user").strip().lower()
+    if _username:
+        try:
+            from pontaj import read_employees, get_user_scopes, apply_scope_filter, set_punch
+            from datetime import date as _date
+
+            _df_all, _ = read_employees(conn)
+            _scopes_df = get_user_scopes(conn, _username)
+            _scopes = _scopes_df.drop(columns=["id"], errors="ignore").to_dict("records")
+            _df_vis = apply_scope_filter(_df_all, _role, _scopes, None)
+
+            _employee_key = None
+            _pref_key = str(st.session_state.get(f"pontaj_pref_emp_{_username}", "") or "").strip()
+            if _pref_key and _df_vis is not None and not _df_vis.empty:
+                _m = _df_vis[_df_vis["employee_key"].astype(str) == _pref_key]
+                if not _m.empty:
+                    _employee_key = str(_m.iloc[0]["employee_key"])
+            if not _employee_key and _df_vis is not None and not _df_vis.empty:
+                _m2 = _df_vis[_df_vis["employee_key"].astype(str).str.lower() == _username.lower()]
+                if not _m2.empty:
+                    _employee_key = str(_m2.iloc[0]["employee_key"])
+            if not _employee_key and _df_vis is not None and not _df_vis.empty:
+                _employee_key = str(_df_vis.iloc[0]["employee_key"])
+            _home_popup_seen_key = f"pontaj_popup_seen_on_home_{_username}_{_date.today().isoformat()}"
+
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stDialog"] [data-testid="stDialogTitle"]{
+                  width: 100% !important;
+                  text-align: center !important;
+                  justify-content: center !important;
+                }
+                div[data-testid="stDialog"] [data-testid="stDialogHeader"]{
+                  display: flex !important;
+                  justify-content: center !important;
+                  align-items: center !important;
+                }
+                div[data-testid="stDialog"] [data-testid="stDialogHeader"] h1,
+                div[data-testid="stDialog"] [data-testid="stDialogHeader"] h2,
+                div[data-testid="stDialog"] [data-testid="stDialogHeader"] div{
+                  width: 100% !important;
+                  text-align: center !important;
+                  margin-left: auto !important;
+                  margin-right: auto !important;
+                }
+                .st-key-home_pontaj_in button,
+                .st-key-home_pontaj_out button{
+                  background: rgba(51,65,85,0.92) !important;
+                  border: 1px solid rgba(148,163,184,0.35) !important;
+                  color: #ffffff !important;
+                  -webkit-text-fill-color: #ffffff !important;
+                  border-radius: 12px !important;
+                }
+                .st-key-home_pontaj_in button:hover,
+                .st-key-home_pontaj_out button:hover{
+                  background: rgba(71,85,105,0.96) !important;
+                  border-color: rgba(56,189,248,0.62) !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            @st.dialog("")
+            def _home_pontaj_dialog():
+                st.markdown(
+                    "<div style='text-align:center;font-size:2rem;font-weight:800;"
+                    "color:rgba(248,250,252,0.98);margin:2px 0 8px 0;'>PONTAJ</div>",
+                    unsafe_allow_html=True,
+                )
+                st.write("Pontaj rapid (Acasă)")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("🟢 INTRARE", use_container_width=True, key="home_pontaj_in"):
+                        if _employee_key:
+                            set_punch(conn, _employee_key, _date.today(), "IN")
+                            st.success("Intrarea a fost înregistrată.")
+                        else:
+                            st.warning("Nu am identificat angajatul curent pentru pontaj.")
+                        st.rerun()
+                with c2:
+                    if st.button("🔴 IESIRE", use_container_width=True, key="home_pontaj_out"):
+                        if _employee_key:
+                            set_punch(conn, _employee_key, _date.today(), "OUT")
+                            st.success("Ieșirea a fost înregistrată.")
+                        else:
+                            st.warning("Nu am identificat angajatul curent pentru pontaj.")
+                        st.rerun()
+
+            _home_pontaj_dialog()
+            st.session_state[_home_popup_seen_key] = True
+        except Exception:
+            pass
+
     _CARD = (
         "background:linear-gradient(135deg,rgba(16,30,48,0.97) 0%,rgba(12,24,40,0.95) 100%);"
         "border:1px solid rgba(148,163,184,0.16);"
@@ -3880,7 +3993,7 @@ def page_home(conn, cfg):
     _MODULES = [
         ("👥", "Angajați",          "Gestionarea fișelor de personal, contracte, date personale și documente salariați."),
         ("📊", "Stat de funcții",   "Structura posturilor aprobate, ocupate și vacante pe departamente."),
-        ("🕒", "Pontaj / Concedii", "Evidența prezenței, orelor lucrate, concediilor și învoirilor."),
+        ("🕒", "Pontaj", "Evidența prezenței, orelor lucrate, concediilor și învoirilor."),
         ("📁", "Dosar profesional", "Dosarul complet al funcționarului public cu toate secțiunile legale."),
         ("🏛️", "Organigramă",       "Vizualizarea ierarhiei instituționale și a structurii organizatorice."),
     ]
@@ -9353,6 +9466,13 @@ def page_angajati(conn: sqlite3.Connection):
           margin-left: 0 !important;
           margin-right: auto !important;
         }
+        /* Tip decizie (preset): text alb */
+        .st-key-emp_subtabs_box [class*="st-key-dec_gen_preset_"] [data-baseweb="select"] *,
+        .st-key-emp_subtabs_box [class*="st-key-dec_gen_preset_"] [data-baseweb="select"] span,
+        .st-key-emp_subtabs_box [class*="st-key-dec_gen_preset_"] [data-baseweb="select"] input{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
         .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] [data-testid="stButton"] > button,
         .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_alte_"] [data-testid="stDownloadButton"] > button{
           width: 420px !important;
@@ -9363,6 +9483,26 @@ def page_angajati(conn: sqlite3.Connection):
           margin-left: 0 !important;
           margin-right: auto !important;
           display: block !important;
+        }
+        /* Documente / Informații salariat: text alb în câmpuri */
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] input,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] textarea,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] [data-baseweb="select"] *{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] input:disabled,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] textarea:disabled,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] [aria-disabled="true"]{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] input::placeholder,
+        .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"] textarea::placeholder{
+          color: rgba(241,245,249,0.88) !important;
+          -webkit-text-fill-color: rgba(241,245,249,0.88) !important;
+          opacity: 1 !important;
         }
         .st-key-emp_main_tabs_box [class*="st-key-ang_docs_"][class*="_det_edit_"] .emp-subsection-title{
           font-size: 1.08rem !important;
@@ -9665,6 +9805,26 @@ def page_angajati(conn: sqlite3.Connection):
           margin-left: 0 !important;
           margin-right: auto !important;
         }
+        /* REGES Online: text alb (inclusiv câmpuri disabled/read-only) */
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] textarea,
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] [data-baseweb="select"] *{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] input:disabled,
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] textarea:disabled,
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] [aria-disabled="true"]{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] input::placeholder,
+        .st-key-emp_subtabs_box [class*="st-key-reg_"] textarea::placeholder{
+          color: rgba(241,245,249,0.88) !important;
+          -webkit-text-fill-color: rgba(241,245,249,0.88) !important;
+          opacity: 1 !important;
+        }
         .st-key-emp_subtabs_box [class*="st-key-reg_save_"] button,
         .st-key-emp_subtabs_box [class*="st-key-reg_cancel_"] button{
           width: 420px !important;
@@ -9720,6 +9880,26 @@ def page_angajati(conn: sqlite3.Connection):
           max-width: 50% !important;
           margin-left: 0 !important;
           margin-right: auto !important;
+        }
+        /* L153/2017: text alb în toate câmpurile (inclusiv disabled/read-only) */
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] input,
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] textarea,
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] [data-baseweb="select"] *{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] input:disabled,
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] textarea:disabled,
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] [aria-disabled="true"]{
+          color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] input::placeholder,
+        .st-key-emp_subtabs_box [class*="st-key-l153_"] textarea::placeholder{
+          color: rgba(241,245,249,0.88) !important;
+          -webkit-text-fill-color: rgba(241,245,249,0.88) !important;
+          opacity: 1 !important;
         }
         /* EMP subtabs: elimină complet alb-ul din casete */
         .st-key-emp_subtabs_box [data-testid="stTextInputRootElement"],
@@ -12939,15 +13119,42 @@ def page_dosar_profesional(conn: sqlite3.Connection, sub_menu: str):
                 section.main:has(#dosar-filter-scope) [data-testid="stCheckbox"] label {
                     font-size: 0.875rem !important;
                     font-weight: 400 !important;
-                    color: rgba(250,250,250,0.92) !important;
+                    color: #ffffff !important;
                     letter-spacing: 0 !important;
                     text-transform: none !important;
                 }
                 /* Text alb în interiorul dropdown-ului */
                 section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] span,
                 section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] div[data-baseweb="select"] div,
-                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [data-baseweb="select"] input {
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [data-baseweb="select"] input,
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [role="button"]{
                     color: #ffffff !important;
+                    -webkit-text-fill-color: #ffffff !important;
+                }
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [data-baseweb="select"] input::selection,
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [data-baseweb="select"] span::selection,
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] [data-baseweb="select"] div::selection{
+                    background: rgba(59,130,246,0.58) !important;
+                    color: #ffffff !important;
+                    -webkit-text-fill-color: #ffffff !important;
+                }
+                section.main:has(#dosar-filter-scope) [data-testid="stSelectbox"] input::placeholder{
+                    color: rgba(241,245,249,0.90) !important;
+                    -webkit-text-fill-color: rgba(241,245,249,0.90) !important;
+                    opacity: 1 !important;
+                }
+                /* Fix punctual: selectbox Nume & Prenume (emp_select_box) */
+                .st-key-emp_select_box [data-baseweb="select"] *,
+                .st-key-emp_select_box [data-baseweb="select"] > div,
+                .st-key-emp_select_box [data-baseweb="select"] span,
+                .st-key-emp_select_box [data-baseweb="select"] input,
+                .st-key-emp_select_box [role="button"],
+                .st-key-emp_select_box .st-ae.st-dg.st-dp.st-f6.st-f7.st-af.st-c0.st-do.st-ag.st-br.st-bs.st-bt.st-bu,
+                .st-key-emp_select_box .st-f8.st-ae.st-d2.st-f9.st-bo.st-ag.st-fa.st-eb.st-fb{
+                    color: #ffffff !important;
+                    -webkit-text-fill-color: #ffffff !important;
+                    text-shadow: none !important;
+                    opacity: 1 !important;
                 }
                 </style>
                 <span id="dosar-filter-scope"></span>
@@ -19791,139 +19998,660 @@ def page_pontaj(conn: sqlite3.Connection, cfg: dict | None = None):
 # MAIN
 # -------------------------------------------------------------
 
+# Salarii 2010 local export helpers
+@dataclass
+class ExportMapping:
+    employees_table: str = "employees"
+    employees_pk: str = "id"
+    employee_join_key_in_timesheet: str = "employee_id"
+    dependents_table: str = "employee_dependents"
+    medical_table: str = "medical_certificates"
+    spor_catalog_table: str = "sporuri_catalog"
+    spor_assign_table: str = "employee_sporuri"
+
+
+@dataclass
+class ExportConfig:
+    template_path: str
+    output_path: str
+    year: int
+    month: int
+    mapping: ExportMapping = field(default_factory=ExportMapping)
+
+    ignore_missing_dependents: bool = True
+    ignore_missing_medicals: bool = True
+    ignore_missing_spor_catalog: bool = True
+    ignore_missing_spor_assign: bool = True
+    active_only: bool = False
+    emp_active_col: Optional[str] = "activ"
+    emp_active_value: Any = 1
+
+
+def _sal2010_table_exists(conn, table_name):
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (str(table_name),),
+    ).fetchone()
+    return row is not None
+
+
+def _sal2010_fetchall_dict(conn, query, params=()):
+    cur = conn.execute(query, params)
+    cols = [c[0] for c in (cur.description or [])]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def _sal2010_norm(v):
+    if v is None:
+        return ""
+    if isinstance(v, (datetime.date, datetime.datetime)):
+        return v.strftime("%Y-%m-%d")
+    return v
+
+
+def _sal2010_bool_da_nu(v):
+    if v in (1, "1", True, "true", "TRUE", "da", "DA", "Da", "yes", "YES"):
+        return "DA"
+    if v in (0, "0", False, "false", "FALSE", "nu", "NU", "Nu", "no", "NO"):
+        return "NU"
+    return _sal2010_norm(v)
+
+
+def _sal2010_headers(ws):
+    hdr = {}
+    for cell in ws[1]:
+        if cell.value:
+            hdr[str(cell.value).strip()] = cell.column
+    return hdr
+
+
+def _sal2010_clear_sheet_data(ws):
+    if ws.max_row > 1:
+        ws.delete_rows(2, ws.max_row - 1)
+
+
+def _sal2010_append_rows_by_headers(ws, rows):
+    hdr = _sal2010_headers(ws)
+    max_col = max(hdr.values()) if hdr else 0
+    for row in rows:
+        values = [""] * max_col
+        for key, value in row.items():
+            col_idx = hdr.get(key)
+            if col_idx:
+                values[col_idx - 1] = value
+        ws.append(values)
+
+
+def _sal2010_load_employees_local(conn):
+    if not _sal2010_table_exists(conn, "employees"):
+        return []
+    cols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employees)").fetchall()}
+
+    def _col_or_empty(col_name, alias):
+        return f"e.{col_name} AS {alias}" if col_name.lower() in cols else f"'' AS {alias}"
+
+    fields = [
+        _col_or_empty("id", "employee_id"),
+        _col_or_empty("cnp", "CNP"),
+        _col_or_empty("nume", "NUME"),
+        _col_or_empty("prenume", "PRENUME"),
+        _col_or_empty("marca", "NR_MARCA"),
+        _col_or_empty("cetatenie", "CETATENIE"),
+        _col_or_empty("strada", "STRADA"),
+        _col_or_empty("numar", "NUMAR"),
+        _col_or_empty("bloc", "BLOC"),
+        _col_or_empty("scara", "SCARA"),
+        _col_or_empty("apartament", "APARTAMENT"),
+        _col_or_empty("localitate", "LOCALITATE"),
+        _col_or_empty("judet", "JUDET"),
+        _col_or_empty("cod_postal", "COD_POSTAL"),
+        _col_or_empty("telefon_mobil", "TELEFON_MOBIL"),
+        _col_or_empty("telefon_fix", "TELEFON_FIX"),
+        _col_or_empty("email", "EMAIL"),
+        _col_or_empty("tip_act", "TIP_ACT"),
+        _col_or_empty("serie_act", "SERIE"),
+        _col_or_empty("numar_act", "NUMAR_ACT"),
+        _col_or_empty("eliberat_de", "ELIBERAT_DE"),
+        _col_or_empty("data_eliberarii", "DATA_ELIBERARII"),
+        _col_or_empty("data_angajare", "DATA_ANGAJARE"),
+        _col_or_empty("data_plecare", "DATA_PLECARE"),
+        _col_or_empty("casa_sanatate", "CASA_SANATATE"),
+    ]
+    order_nume = "e.nume" if "nume" in cols else ("e.id" if "id" in cols else "1")
+    order_prenume = "e.prenume" if "prenume" in cols else ("e.id" if "id" in cols else "1")
+    q = f"SELECT {', '.join(fields)} FROM employees e ORDER BY {order_nume}, {order_prenume}"
+    rows = _sal2010_fetchall_dict(conn, q)
+    for r in rows:
+        for k in list(r.keys()):
+            r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_load_pontaj_local(conn, year, month):
+    if not _sal2010_table_exists(conn, "pontaj") or not _sal2010_table_exists(conn, "employees"):
+        return []
+    q = """
+        SELECT
+            COALESCE(e.cnp, '') AS CNP,
+            ? AS AN,
+            ? AS LUNA,
+            '' AS FUNCTIE,
+            '' AS SECTIE,
+            '' AS LOC_MUNCA,
+            '' AS SALARIU_BAZA,
+            COALESCE(SUM(COALESCE(p.ore_lucru, 0)), 0) AS ORE_LUCRATE,
+            '' AS ORE_SUPLIMENTARE,
+            '' AS ORE_NOAPTE,
+            '' AS ORE_WEEKEND,
+            COUNT(DISTINCT CASE
+                WHEN (
+                    UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('', 'LUCRU', 'LUCRAT', 'L', 'WORK', 'PREZENT', 'NORMAL')
+                    OR (
+                        COALESCE(p.ore_lucru, 0) > 0
+                        AND UPPER(TRIM(COALESCE(p.tip_zi, ''))) NOT IN ('CM', 'CO', 'CFS', 'CFP', 'FS', 'SUSP', 'SUSPENDAT')
+                    )
+                )
+                THEN DATE(p.data) END
+            ) AS ZILE_LUCRATE,
+            COUNT(DISTINCT CASE
+                WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) = 'CM'
+                THEN DATE(p.data) END
+            ) AS ZILE_CM,
+            COUNT(DISTINCT CASE
+                WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) = 'CO'
+                THEN DATE(p.data) END
+            ) AS ZILE_CO,
+            COUNT(DISTINCT CASE
+                WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('CFS', 'CFP', 'FS')
+                THEN DATE(p.data) END
+            ) AS ZILE_FARA_PLATA,
+            COUNT(DISTINCT CASE
+                WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('SUSP', 'SUSPENDAT')
+                THEN DATE(p.data) END
+            ) AS ZILE_SUSPENDATE,
+            (
+                COUNT(DISTINCT CASE
+                    WHEN (
+                        UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('', 'LUCRU', 'LUCRAT', 'L', 'WORK', 'PREZENT', 'NORMAL')
+                        OR (
+                            COALESCE(p.ore_lucru, 0) > 0
+                            AND UPPER(TRIM(COALESCE(p.tip_zi, ''))) NOT IN ('CM', 'CO', 'CFS', 'CFP', 'FS', 'SUSP', 'SUSPENDAT')
+                        )
+                    )
+                    THEN DATE(p.data) END
+                )
+                + COUNT(DISTINCT CASE
+                    WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) = 'CM'
+                    THEN DATE(p.data) END
+                )
+                + COUNT(DISTINCT CASE
+                    WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) = 'CO'
+                    THEN DATE(p.data) END
+                )
+                + COUNT(DISTINCT CASE
+                    WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('CFS', 'CFP', 'FS')
+                    THEN DATE(p.data) END
+                )
+                + COUNT(DISTINCT CASE
+                    WHEN UPPER(TRIM(COALESCE(p.tip_zi, ''))) IN ('SUSP', 'SUSPENDAT')
+                    THEN DATE(p.data) END
+                )
+            ) AS TOTAL_ZILE
+        FROM pontaj p
+        JOIN employees e ON e.id = p.employee_id
+        WHERE strftime('%Y', p.data) = ? AND strftime('%m', p.data) = ?
+        GROUP BY e.id, e.cnp, e.nume, e.prenume
+        ORDER BY e.nume, e.prenume
+    """
+    # Compatibility path for app.py local pontaj table
+    rows = _sal2010_fetchall_dict(conn, q, (int(year), int(month), str(int(year)), f"{int(month):02d}"))
+    for r in rows:
+        for k in list(r.keys()):
+            r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_load_dependents_local(conn):
+    if not _sal2010_table_exists(conn, "employee_dependents") or not _sal2010_table_exists(conn, "employees"):
+        return []
+    cols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employee_dependents)").fetchall()}
+    ecols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employees)").fetchall()}
+    fk_col = next((c for c in ["employee_id", "employee_fk", "angajat_id", "emp_id"] if c in cols), None)
+    if not fk_col:
+        return []
+
+    def _dcol_or_empty(col_name, alias):
+        return f"d.{col_name} AS {alias}" if col_name.lower() in cols else f"'' AS {alias}"
+
+    dep_order_nume = "d.nume" if "nume" in cols else "1"
+    dep_order_prenume = "d.prenume" if "prenume" in cols else "1"
+    emp_order_nume = "e.nume" if "nume" in ecols else ("e.id" if "id" in ecols else "1")
+    emp_order_prenume = "e.prenume" if "prenume" in ecols else ("e.id" if "id" in ecols else "1")
+    q = f"""
+        SELECT
+            COALESCE(e.cnp, '') AS CNP_ANGAJAT,
+            {_dcol_or_empty("nume", "NUME")},
+            {_dcol_or_empty("prenume", "PRENUME")},
+            {_dcol_or_empty("cnp", "CNP")},
+            {_dcol_or_empty("calitate", "TIP_PERSOANA")},
+            {_dcol_or_empty("grad_handicap", "GRAD_HANDICAP")},
+            {_dcol_or_empty("data_start", "DATA_START")},
+            {_dcol_or_empty("data_end", "DATA_END")}
+        FROM employee_dependents d
+        JOIN employees e ON e.id = d.{fk_col}
+        ORDER BY {emp_order_nume}, {emp_order_prenume}, {dep_order_nume}, {dep_order_prenume}
+    """
+    rows = _sal2010_fetchall_dict(conn, q)
+    for r in rows:
+        for k in list(r.keys()):
+            r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_load_medicals_local(conn, year, month):
+    if not _sal2010_table_exists(conn, "medical_certificates") or not _sal2010_table_exists(conn, "employees"):
+        return []
+    mcols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(medical_certificates)").fetchall()}
+    ecols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employees)").fetchall()}
+
+    join_clause = None
+    if "employee_id" in mcols and "id" in ecols:
+        join_clause = "JOIN employees e ON e.id = med.employee_id"
+    elif "employee_fk" in mcols and "id" in ecols:
+        join_clause = "JOIN employees e ON e.id = med.employee_fk"
+    elif "employee_key" in mcols and "marca" in ecols:
+        join_clause = "JOIN employees e ON CAST(e.marca AS TEXT) = CAST(med.employee_key AS TEXT)"
+    elif "marca" in mcols and "marca" in ecols:
+        join_clause = "JOIN employees e ON CAST(e.marca AS TEXT) = CAST(med.marca AS TEXT)"
+    elif "cnp" in mcols and "cnp" in ecols:
+        join_clause = "JOIN employees e ON CAST(e.cnp AS TEXT) = CAST(med.cnp AS TEXT)"
+    if not join_clause:
+        return []
+
+    date_col = next((c for c in ["start_date", "data_start", "issued_date", "data_acordare"] if c in mcols), None)
+    if not date_col:
+        return []
+
+    def _first_existing(col_list):
+        if isinstance(col_list, str):
+            col_list = [col_list]
+        for c in col_list:
+            if c in mcols:
+                return c
+        return None
+
+    def _mcol_or_empty(col_list, alias):
+        c = _first_existing(col_list)
+        return f"med.{c} AS {alias}" if c else f"'' AS {alias}"
+
+    q = f"""
+        SELECT
+            COALESCE(e.cnp, '') AS CNP,
+            ? AS AN,
+            ? AS LUNA,
+            {_mcol_or_empty(["serie", "serie_certificat"], "SERIE_CERTIFICAT")},
+            {_mcol_or_empty(["numar", "numar_certificat"], "NUMAR_CERTIFICAT")},
+            {_mcol_or_empty(["issued_date", "data_acordare"], "DATA_ACORDARE")},
+            {_mcol_or_empty(["start_date", "data_start"], "DATA_START")},
+            {_mcol_or_empty(["end_date", "data_end"], "DATA_END")},
+            {_mcol_or_empty(["cod_indemnizatie"], "COD_INDEMNIZATIE")},
+            {_mcol_or_empty(["procent", "procent_indemnizatie"], "PROCENT_INDEMNIZATIE")},
+            {_mcol_or_empty(["zile_calendaristice", "days_calendar"], "ZILE_CALENDARISTICE")},
+            {_mcol_or_empty(["zile_lucratoare"], "ZILE_LUCRATOARE")},
+            {_mcol_or_empty(["baza_calcul"], "BAZA_CALCUL")},
+            {_mcol_or_empty(["indemnizatie_zi"], "INDEMNIZATIE_ZI")},
+            {_mcol_or_empty(["zile_fnuass", "pay_fnuass_days"], "ZILE_FNUASS")},
+            {_mcol_or_empty(["zile_angajator", "pay_employer_days"], "ZILE_ANGAJATOR")},
+            {_mcol_or_empty(["observatii", "notes"], "OBSERVATII")}
+        FROM medical_certificates med
+        {join_clause}
+        WHERE strftime('%Y', med.{date_col}) = ? AND strftime('%m', med.{date_col}) = ?
+        ORDER BY e.nume, e.prenume, med.{date_col}
+    """
+    rows = _sal2010_fetchall_dict(conn, q, (int(year), int(month), str(int(year)), f"{int(month):02d}"))
+    for r in rows:
+        for k in list(r.keys()):
+            r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_load_spor_catalog_local(conn):
+    if not _sal2010_table_exists(conn, "sporuri_catalog"):
+        return []
+    cols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(sporuri_catalog)").fetchall()}
+
+    def _scol_or_empty(col_name, alias):
+        return f"s.{col_name} AS {alias}" if col_name.lower() in cols else f"'' AS {alias}"
+
+    order_ordine = "COALESCE(s.ordine, 999999)" if "ordine" in cols else "999999"
+    order_name = "s.denumire_spor" if "denumire_spor" in cols else "1"
+    q = f"""
+        SELECT
+            {_scol_or_empty("cod_spor", "COD_SPOR")},
+            {_scol_or_empty("denumire_spor", "DENUMIRE_SPOR")},
+            {_scol_or_empty("tip_calcul", "TIP_CALCUL")},
+            {_scol_or_empty("baza_calcul", "BAZA_CALCUL")},
+            {_scol_or_empty("procent", "PROCENT")},
+            {_scol_or_empty("suma_fixa", "SUMA_FIXA")},
+            {_scol_or_empty("ordine", "ORDINE")},
+            {_scol_or_empty("activ", "ACTIV")},
+            {_scol_or_empty("observatii", "OBSERVATII")}
+        FROM sporuri_catalog s
+        ORDER BY {order_ordine}, {order_name}
+    """
+    rows = _sal2010_fetchall_dict(conn, q)
+    for r in rows:
+        r["ACTIV"] = _sal2010_bool_da_nu(r.get("ACTIV"))
+        for k in list(r.keys()):
+            if k != "ACTIV":
+                r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_load_spor_assign_local(conn, year, month):
+    if not _sal2010_table_exists(conn, "employee_sporuri") or not _sal2010_table_exists(conn, "employees"):
+        return []
+    cols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employee_sporuri)").fetchall()}
+    fk_col = next((c for c in ["employee_id", "employee_fk", "angajat_id", "emp_id"] if c in cols), None)
+    if not fk_col:
+        return []
+    ecols = {str(r[1]).lower() for r in conn.execute("PRAGMA table_info(employees)").fetchall()}
+    has_year = "year" in cols
+    has_month = "month" in cols
+    has_activ = "activ" in cols
+    has_cod_spor = "cod_spor" in cols
+    has_obs = "observatii" in cols
+
+    where_parts = []
+    params = [int(year), int(month)]
+    if has_year and has_month:
+        where_parts.append("a.year = ? AND a.month = ?")
+        params.extend([int(year), int(month)])
+    elif has_year:
+        where_parts.append("a.year = ?")
+        params.append(int(year))
+    elif has_month:
+        where_parts.append("a.month = ?")
+        params.append(int(month))
+    else:
+        if has_activ:
+            where_parts.append("COALESCE(CAST(a.activ AS TEXT), '1') NOT IN ('0','false','FALSE','nu','NU')")
+
+    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    emp_order_nume = "e.nume" if "nume" in ecols else ("e.id" if "id" in ecols else "1")
+    emp_order_prenume = "e.prenume" if "prenume" in ecols else ("e.id" if "id" in ecols else "1")
+    q = f"""
+        SELECT
+            COALESCE(e.cnp, '') AS CNP,
+            ? AS AN,
+            ? AS LUNA,
+            {("COALESCE(a.cod_spor, '') AS COD_SPOR" if has_cod_spor else "'' AS COD_SPOR")},
+            {("COALESCE(a.activ, '') AS ACTIV" if has_activ else "'' AS ACTIV")},
+            {("COALESCE(a.observatii, '') AS OBSERVATII" if has_obs else "'' AS OBSERVATII")}
+        FROM employee_sporuri a
+        JOIN employees e ON e.id = a.{fk_col}
+        {where_sql}
+        ORDER BY {emp_order_nume}, {emp_order_prenume} {(", a.cod_spor" if has_cod_spor else "")}
+    """
+    rows = _sal2010_fetchall_dict(conn, q, tuple(params))
+    for r in rows:
+        r["ACTIV"] = _sal2010_bool_da_nu(r.get("ACTIV"))
+        for k in list(r.keys()):
+            if k != "ACTIV":
+                r[k] = _sal2010_norm(r[k])
+    return rows
+
+
+def _sal2010_export_workbook_local(conn, template_path, output_path, year, month):
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise RuntimeError("Lipsește pachetul openpyxl pe server. Instalează-l pentru a genera exportul Salarii 2010.")
+
+    wb = load_workbook(template_path)
+    required_sheets = [
+        "ANGAJATI",
+        "PONTAJ_LUNAR",
+        "PERSOANE_INTRETINERE",
+        "CERTIFICATE_MEDICALE",
+        "NOMENCLATOR_SPORURI",
+        "SPORURI_ANGAJATI",
+    ]
+    missing = [s for s in required_sheets if s not in wb.sheetnames]
+    if missing:
+        raise RuntimeError(f"Șablon invalid. Lipsesc sheet-urile: {', '.join(missing)}")
+
+    employees = _sal2010_load_employees_local(conn)
+    pontaj = _sal2010_load_pontaj_local(conn, year, month)
+    dependents = _sal2010_load_dependents_local(conn)
+    medicals = _sal2010_load_medicals_local(conn, year, month)
+    spor_catalog = _sal2010_load_spor_catalog_local(conn)
+    spor_assign = _sal2010_load_spor_assign_local(conn, year, month)
+
+    for s in required_sheets:
+        _sal2010_clear_sheet_data(wb[s])
+
+    _sal2010_append_rows_by_headers(wb["ANGAJATI"], employees)
+    _sal2010_append_rows_by_headers(wb["PONTAJ_LUNAR"], pontaj)
+    _sal2010_append_rows_by_headers(wb["PERSOANE_INTRETINERE"], dependents)
+    _sal2010_append_rows_by_headers(wb["CERTIFICATE_MEDICALE"], medicals)
+    _sal2010_append_rows_by_headers(wb["NOMENCLATOR_SPORURI"], spor_catalog)
+    _sal2010_append_rows_by_headers(wb["SPORURI_ANGAJATI"], spor_assign)
+    wb.active = wb["ANGAJATI"]
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(output_path)
+    return str(output_path)
+
+
+def export_salarii_2010(conn: sqlite3.Connection, cfg: ExportConfig) -> str:
+    template_path = Path(cfg.template_path)
+    output_path = Path(cfg.output_path)
+    return _sal2010_export_workbook_local(
+        conn=conn,
+        template_path=template_path,
+        output_path=output_path,
+        year=int(cfg.year),
+        month=int(cfg.month),
+    )
+
+
+def export_salarii_2010_streamlit(
+    conn: sqlite3.Connection,
+    template_path: str,
+    year: int,
+    month: int,
+    output_path: str,
+    mapping: Optional[ExportMapping] = None,
+) -> str:
+    cfg = ExportConfig(
+        template_path=template_path,
+        output_path=output_path,
+        year=int(year),
+        month=int(month),
+        mapping=mapping or ExportMapping(),
+    )
+    return export_salarii_2010(conn, cfg)
+
+
+def render_export_salarii_2010_integrat(conn, cfg):
+    st.markdown("### 💼 Export master data pentru Salarii 2010")
+    st.caption("Exportă doar datele-sursă către șablonul Salarii 2010. Nu calculează salarii.")
+
+    c1, c2 = st.columns([0.25, 0.25])
+    with c1:
+        year = st.number_input("An", min_value=2000, max_value=2100, value=int(datetime.date.today().year), step=1, key="sal2010_year")
+    with c2:
+        month = st.selectbox(
+            "Lună",
+            options=list(range(1, 13)),
+            index=int(datetime.date.today().month) - 1,
+            format_func=lambda m: f"{int(m):02d}",
+            key="sal2010_month",
+        )
+
+    template_file = st.file_uploader(
+        "Șablon Salarii 2010 (.xlsx)",
+        type=["xlsx"],
+        key="sal2010_template_upl",
+    )
+    output_filename = st.text_input(
+        "Nume fișier export",
+        value=f"export_salarii_2010_{int(year)}_{int(month):02d}.xlsx",
+        key="sal2010_output_filename",
+    ).strip()
+
+    emp_rows = len(_sal2010_load_employees_local(conn))
+    pontaj_rows = len(_sal2010_load_pontaj_local(conn, int(year), int(month)))
+    dep_rows = len(_sal2010_load_dependents_local(conn))
+    med_rows = len(_sal2010_load_medicals_local(conn, int(year), int(month)))
+    spor_cat_rows = len(_sal2010_load_spor_catalog_local(conn))
+    spor_assign_rows = len(_sal2010_load_spor_assign_local(conn, int(year), int(month)))
+
+    st.markdown("#### Preview date export")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.caption(f"Perioadă: **{int(year)}-{int(month):02d}**")
+        st.caption(f"Șablon: **{'încărcat' if template_file is not None else 'lipsește'}**")
+    with m2:
+        st.caption(f"Angajați: **{emp_rows}**")
+        st.caption(f"Pontaj lunar: **{pontaj_rows}**")
+        st.caption(f"Dependenți: **{dep_rows}**")
+    with m3:
+        st.caption(f"Certificate medicale: **{med_rows}**")
+        st.caption(f"Nomenclator sporuri: **{spor_cat_rows}**")
+        st.caption(f"Sporuri angajați: **{spor_assign_rows}**")
+
+    if st.button("Generează exportul Salarii 2010", key="sal2010_export_btn"):
+        if template_file is None:
+            st.info("Încarcă șablonul Excel pentru a genera exportul.")
+            return
+        if not output_filename:
+            output_filename = f"export_salarii_2010_{int(year)}_{int(month):02d}.xlsx"
+        output_filename = output_filename.strip()
+        if not output_filename.lower().endswith(".xlsx"):
+            output_filename += ".xlsx"
+        try:
+            exports_dir = Path(__file__).resolve().parent / "exports"
+            exports_dir.mkdir(parents=True, exist_ok=True)
+            template_path = exports_dir / "_sal2010_template_upload.xlsx"
+            template_path.write_bytes(template_file.getvalue())
+            out_path = exports_dir / output_filename
+
+            exp_cfg = ExportConfig(
+                template_path=str(template_path),
+                output_path=str(out_path),
+                year=int(year),
+                month=int(month),
+            )
+            generated_path = export_salarii_2010(conn, exp_cfg)
+            out_bytes = Path(generated_path).read_bytes()
+            st.success(f"Export generat cu succes: {Path(generated_path).name}")
+            st.download_button(
+                "⬇️ Descarcă fișierul exportat",
+                data=out_bytes,
+                file_name=Path(generated_path).name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="sal2010_download_btn",
+            )
+        except RuntimeError as e:
+            st.error(str(e))
+        except Exception as e:
+            st.error(f"Eroare la exportul Salarii 2010: {e}")
+
+
 def page_pontaj_hub(conn, cfg: dict):
     """Hub Pontaj: include aplicația Pontaj separată + centralizator concedii (în același tab)."""
     st.markdown('<h2 class="page-title">Pontaj</h2>', unsafe_allow_html=True)
-    pontaj_url_default = cfg.get("pontaj_url") or "http://localhost:8502"
+    pontaj_url_effective = st.session_state.get("pontaj_url_inline", cfg.get("pontaj_url") or "http://localhost:8502")
 
-    # Layout/typography: aceleași setări ca în „Pontaj angajați” (50% stânga, text mai mic, linii fine)
+    # Switch principal: Pontaj integrat | Aplicație Pontaj
     st.markdown(
         """
         <style>
-        .st-key-pontaj_hub_shell{
-          width: 100% !important;
-          max-width: 100% !important;
-          margin-left: 0 !important;
-          margin-right: 0 !important;
+        /* 1:1 cu .st-key-coperta_tabs_box (Dosar profesional → Copertă) */
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] > div[role="tablist"]{
+          display: flex !important;
+          gap: 0 !important;
+          margin: 6px 0 14px 0 !important;
+          padding: 0 !important;
+          border-bottom: 1px solid rgba(148,163,184,0.28) !important;
         }
-        .st-key-pontaj_hub_shell h2.page-title{ font-size: 22px !important; }
-        .st-key-pontaj_hub_shell h2.page-title::after{
-          content: "" !important;
-          display: block !important;
-          height: 1px !important;
-          width: min(520px, 100%) !important;
-          margin-top: 10px !important;
-          background: linear-gradient(
-            90deg,
-            rgba(148,163,184,0.46) 0%,
-            rgba(148,163,184,0.22) 55%,
-            rgba(148,163,184,0.02) 100%
-          ) !important;
-        }
-        .st-key-pontaj_hub_shell .stMarkdown h3,
-        .st-key-pontaj_hub_shell h3{
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] button[role="tab"]{
+          min-height: 38px !important;
+          height: 38px !important;
+          padding: 0 18px !important;
+          border: none !important;
+          border-radius: 0 !important;
+          border-bottom: 2px solid transparent !important;
+          background: transparent !important;
+          color: rgba(226,232,240,0.78) !important;
           font-size: 0.94rem !important;
-          font-weight: 860 !important;
-          letter-spacing: 0.01em !important;
-          margin-bottom: 10px !important;
-          padding-bottom: 8px !important;
-          position: relative !important;
+          font-weight: 600 !important;
+          margin: 0 !important;
+          transition: color .18s ease, border-color .18s ease !important;
         }
-        .st-key-pontaj_hub_shell .stMarkdown h3::after,
-        .st-key-pontaj_hub_shell h3::after{
-          content: "" !important;
-          display: block !important;
-          height: 1px !important;
-          width: min(520px, 100%) !important;
-          margin-top: 8px !important;
-          background: linear-gradient(
-            90deg,
-            rgba(148,163,184,0.46) 0%,
-            rgba(148,163,184,0.22) 55%,
-            rgba(148,163,184,0.02) 100%
-          ) !important;
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] button[role="tab"]:hover{
+          color: rgba(248,250,252,0.96) !important;
         }
-        .st-key-pontaj_hub_shell p,
-        .st-key-pontaj_hub_shell label,
-        .st-key-pontaj_hub_shell .stCaption{
-          font-size: 0.85rem !important;
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+          background: transparent !important;
+          color: #ffffff !important;
+          border-bottom-color: rgba(56,189,248,0.92) !important;
+          box-shadow: none !important;
+        }
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] [data-baseweb="tab-border"]{
+          display: none !important;
+        }
+        .st-key-pontaj_mode_tabs div[data-testid="stTabs"] [role="tabpanel"]{
+          padding-top: 8px !important;
+          border: 0 !important;
+          box-shadow: none !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+    with st.container(key="pontaj_mode_tabs"):
+        tab_integrat, tab_aplicatie = st.tabs(["Pontaj integrat", "Aplicație Pontaj"])
 
-    with st.container(key="pontaj_hub_shell"):
-        # Switch intern premium (înlocuiește radio): Pontaj | Centralizator concedii
+    with tab_integrat:
+        # Pontaj integrat inner tabs
+        tab_modul_pontaj, tab_export_sal = st.tabs(["Modul Pontaj", "💼 Export Salarii 2010"])
+
+        with tab_modul_pontaj:
+            try:
+                from pontaj import render_embedded_pontaj
+
+                user_ctx = {
+                    "username": st.session_state.get("username", ""),
+                    "role": st.session_state.get("user_role", "user"),
+                    "employee_key": None,
+                }
+                render_embedded_pontaj(conn, cfg, user_ctx)
+            except Exception as e:
+                st.error(f"Modulul Pontaj integrat nu a putut fi încărcat: {e}")
+                st.info("Poți folosi temporar varianta «Aplicație separată».")
+
+        with tab_export_sal:
+            try:
+                render_export_salarii_2010_integrat(conn, cfg)
+            except Exception as e:
+                st.error(f"Exportul Salarii 2010 nu a putut fi încărcat: {e}")
+
+    with tab_aplicatie:
+        # Layout/typography: aceleași setări ca în „Pontaj angajați” (50% stânga, text mai mic, linii fine)
         st.markdown(
             """
             <style>
-            .st-key-pontaj_switch_box [data-testid="stTabs"] > div[role="tablist"]{
-              display:flex !important;
-              gap: 0 !important;
-              padding: 0 !important;
-              margin: 8px 0 16px 0 !important;
-              border-bottom: 1px solid rgba(148,163,184,0.28) !important;
-              justify-content: flex-start !important;
+            .st-key-pontaj_hub_shell{
+              width: 100% !important;
+              max-width: 100% !important;
+              margin-left: 0 !important;
+              margin-right: 0 !important;
             }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]{
-              min-height: 38px !important;
-              height: 38px !important;
-              padding: 0 14px !important;
-              border: none !important;
-              border-radius: 0 !important;
-              background: transparent !important;
-              color: rgba(226,232,240,0.88) !important;
-              font-weight: 800 !important;
-              letter-spacing: 0.01em !important;
-              box-shadow: none !important;
-              transition: color .18s ease, border-color .18s ease, background-color .18s ease !important;
-              border-bottom: 2px solid transparent !important;
-              margin: 0 !important;
-            }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:hover{
-              background: transparent !important;
-              color: rgba(248,250,252,0.94) !important;
-            }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:focus,
-            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"]:focus-visible{
-              background: transparent !important;
-              outline: none !important;
-              box-shadow: none !important;
-            }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
-              background: transparent !important;
-              color: rgba(248,250,252,0.98) !important;
-              border-bottom: 2px solid rgba(56,189,248,0.92) !important; /* bara albastră activă */
-              box-shadow: none !important;
-            }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] [data-baseweb="tab-border"]{
-              display:none !important;
-            }
-            .st-key-pontaj_switch_box [data-testid="stTabs"] [role="tabpanel"]{
-              padding-top: 8px !important;
-              border: 0 !important;
-              box-shadow: none !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        with st.container(key="pontaj_switch_box"):
-            tab_pontaj, tab_centr = st.tabs(["Pontaj", "Centralizator concedii"])
-
-    with tab_pontaj:
-        # UI curat: pentru user obișnuit afișăm doar butonul + text scurt (ne-tehnic).
-        st.markdown(
-            """
-            <style>
-            .st-key-pontaj_open_block .stMarkdown h3{
-              font-size: 22px !important;   /* ca „Pontaj angajați” */
-              padding-bottom: 0 !important;
-              margin-bottom: 6px !important;
-            }
-            .st-key-pontaj_open_block .stMarkdown h3::after{
+            .st-key-pontaj_hub_shell h2.page-title{ font-size: 22px !important; }
+            .st-key-pontaj_hub_shell h2.page-title::after{
               content: "" !important;
               display: block !important;
               height: 1px !important;
@@ -19936,37 +20664,170 @@ def page_pontaj_hub(conn, cfg: dict):
                 rgba(148,163,184,0.02) 100%
               ) !important;
             }
+            .st-key-pontaj_hub_shell .stMarkdown h3,
+            .st-key-pontaj_hub_shell h3{
+              font-size: 0.94rem !important;
+              font-weight: 860 !important;
+              letter-spacing: 0.01em !important;
+              margin-bottom: 10px !important;
+              padding-bottom: 8px !important;
+              position: relative !important;
+            }
+            .st-key-pontaj_hub_shell .stMarkdown h3::after,
+            .st-key-pontaj_hub_shell h3::after{
+              content: "" !important;
+              display: block !important;
+              height: 1px !important;
+              width: min(520px, 100%) !important;
+              margin-top: 8px !important;
+              background: linear-gradient(
+                90deg,
+                rgba(148,163,184,0.46) 0%,
+                rgba(148,163,184,0.22) 55%,
+                rgba(148,163,184,0.02) 100%
+              ) !important;
+            }
+            .st-key-pontaj_hub_shell p,
+            .st-key-pontaj_hub_shell label,
+            .st-key-pontaj_hub_shell .stCaption{
+              font-size: 0.85rem !important;
+            }
+            .st-key-pontaj_hub_shell input,
+            .st-key-pontaj_hub_shell textarea,
+            .st-key-pontaj_hub_shell [data-baseweb="select"] *,
+            .st-key-pontaj_hub_shell [data-baseweb="input"] *,
+            .st-key-pontaj_hub_shell [data-baseweb="base-input"] *{
+              color: #ffffff !important;
+              -webkit-text-fill-color: #ffffff !important;
+            }
+            .st-key-pontaj_hub_shell input::placeholder,
+            .st-key-pontaj_hub_shell textarea::placeholder{
+              color: rgba(241,245,249,0.88) !important;
+              -webkit-text-fill-color: rgba(241,245,249,0.88) !important;
+              opacity: 1 !important;
+            }
             </style>
             """,
             unsafe_allow_html=True,
         )
-        with st.container(key="pontaj_open_block"):
-            st.markdown("### Deschide modulul Pontaj")
-            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        st.caption("Pontajul se deschide într-un modul separat, găzduit pe același server.")
-        st.link_button("Deschide modulul Pontaj", pontaj_url_default)
-        page_pontaj(conn, cfg)
 
-        # Setări avansate (doar admin): URL + ajutor tehnic, jos în pagină
-        try:
-            is_admin = str(st.session_state.get("user_role", "user")) == "admin"
-        except Exception:
-            is_admin = False
+        with st.container(key="pontaj_hub_shell"):
+            # Switch intern premium: Pontaj | Centralizator concedii
+            st.markdown(
+                """
+                <style>
+                /* 1:1 cu .st-key-coperta_tabs_box */
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] > div[role="tablist"]{
+                  display: flex !important;
+                  gap: 0 !important;
+                  margin: 6px 0 14px 0 !important;
+                  padding: 0 !important;
+                  border-bottom: 1px solid rgba(148,163,184,0.28) !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] button[role="tab"]{
+                  min-height: 38px !important;
+                  height: 38px !important;
+                  padding: 0 18px !important;
+                  border: none !important;
+                  border-radius: 0 !important;
+                  border-bottom: 2px solid transparent !important;
+                  background: transparent !important;
+                  color: rgba(226,232,240,0.78) !important;
+                  font-size: 0.94rem !important;
+                  font-weight: 600 !important;
+                  margin: 0 !important;
+                  transition: color .18s ease, border-color .18s ease !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] button[role="tab"]:hover{
+                  color: rgba(248,250,252,0.96) !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] button[role="tab"]:focus,
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] button[role="tab"]:focus-visible{
+                  background: transparent !important;
+                  outline: none !important;
+                  box-shadow: none !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]{
+                  background: transparent !important;
+                  color: #ffffff !important;
+                  border-bottom-color: rgba(56,189,248,0.92) !important;
+                  box-shadow: none !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] [data-baseweb="tab-border"]{
+                  display:none !important;
+                }
+                .st-key-pontaj_switch_box div[data-testid="stTabs"] [role="tabpanel"]{
+                  padding-top: 8px !important;
+                  border: 0 !important;
+                  box-shadow: none !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
-        if is_admin:
-            st.markdown("---")
-            with st.expander("Setări avansate", expanded=False):
-                pontaj_url = st.text_input(
-                    "Adresă modul Pontaj",
-                    value=pontaj_url_default,
-                    key="pontaj_url_inline",
-                    help="Ex: http://server:8502",
-                )
-                st.caption("Dacă nu se deschide: verifică accesul la server și disponibilitatea serviciului Pontaj.")
-                st.caption(f"Adresă curentă: {pontaj_url}")
+            with st.container(key="pontaj_switch_box"):
+                tab_pontaj, tab_centr = st.tabs(["Pontaj", "Centralizator concedii"])
 
-    with tab_centr:
-        page_centralizator_concedii(conn)
+        with tab_pontaj:
+            # UI curat: pentru user obișnuit afișăm doar butonul + text scurt (ne-tehnic).
+            st.markdown(
+                """
+                <style>
+                .st-key-pontaj_open_block .stMarkdown h3{
+                  font-size: 22px !important;   /* ca „Pontaj angajați” */
+                  padding-bottom: 0 !important;
+                  margin-bottom: 6px !important;
+                }
+                .st-key-pontaj_open_block .stMarkdown h3::after{
+                  content: "" !important;
+                  display: block !important;
+                  height: 1px !important;
+                  width: min(520px, 100%) !important;
+                  margin-top: 10px !important;
+                  background: linear-gradient(
+                    90deg,
+                    rgba(148,163,184,0.46) 0%,
+                    rgba(148,163,184,0.22) 55%,
+                    rgba(148,163,184,0.02) 100%
+                  ) !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+            with st.container(key="pontaj_open_block"):
+                st.markdown("### Deschide modulul Pontaj")
+                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            st.caption("Pontajul se deschide într-un modul separat, găzduit pe același server.")
+            st.link_button("Deschide modulul Pontaj", pontaj_url_effective)
+            page_pontaj(conn, cfg)
+
+            # Setări avansate (doar admin): URL + ajutor tehnic, jos în pagină
+            try:
+                is_admin = str(st.session_state.get("user_role", "user")) == "admin"
+            except Exception:
+                is_admin = False
+
+            if is_admin:
+                st.markdown("---")
+                with st.expander("Setări avansate", expanded=False):
+                    pontaj_url_effective = st.text_input(
+                        "Adresă modul Pontaj",
+                        value=st.session_state.get("pontaj_url_inline", cfg.get("pontaj_url") or "http://localhost:8502"),
+                        key="pontaj_url_inline",
+                        help="Ex: http://server:8502",
+                    )
+                    if st.button("Salvează URL Pontaj", key="pontaj_save_url_btn"):
+                        cfg["pontaj_url"] = pontaj_url_effective.strip()
+                        save_config(cfg)
+                        st.success("URL-ul modulului Pontaj a fost salvat.")
+                        st.rerun()
+                    st.caption("Dacă nu se deschide: verifică accesul la server și disponibilitatea serviciului Pontaj.")
+                    st.caption(f"Adresă curentă: {pontaj_url_effective}")
+
+        with tab_centr:
+            page_centralizator_concedii(conn)
 
 
 def main():
@@ -20038,7 +20899,7 @@ def main():
 
     # Navigare principală: meniu unitar, cu spacing controlat, dar păstrând aceleași valori logice.
     OPS = ["🏠 Acasă", "🌳 Organigramă", "👥 Angajați"]
-    ADM = ["📋 Stat de funcții", "📅 Pontaj / Concedii", "🗂️ Dosar profesional", "🔧 Configurare"]
+    ADM = ["📋 Stat de funcții", "📅 Pontaj", "🗂️ Dosar profesional", "🔧 Configurare"]
     NAV = OPS + ADM
     NAV_ALIAS = {
         "Acasă": "🏠 Acasă",
@@ -20046,7 +20907,7 @@ def main():
         "Organigramă": "🌳 Organigramă",
         "Angajați": "👥 Angajați",
         "Stat de funcții": "📋 Stat de funcții",
-        "Pontaj / Concedii": "📅 Pontaj / Concedii",
+        "Pontaj": "📅 Pontaj",
         "Dosar profesional": "🗂️ Dosar profesional",
         "Configurare": "🔧 Configurare",
     }
@@ -20162,7 +21023,7 @@ def main():
 
     elif main_choice == "🗂️ Dosar profesional":
         page_dosar_profesional(conn, st.session_state.get("sub_menu", "Copertă"))
-    elif main_choice == "📅 Pontaj / Concedii":
+    elif main_choice == "📅 Pontaj":
         page_pontaj_hub(conn, cfg)
 
     elif main_choice == "🔧 Configurare":
@@ -20173,7 +21034,7 @@ def main():
             <style>
             /* ===== Configurare – layout single column, premium ===== */
             section.main:has(#cfg-scope) .page-container{
-              max-width: 880px;
+              max-width: 440px;
               margin-left: 60px;
               margin-right: auto;
               padding-top: 40px;
@@ -20181,11 +21042,11 @@ def main():
             }
 
             section.main:has(#cfg-scope) .section-card{
-              background: #162a3d;
-              border: 1px solid #2c445c;
-              border-radius: 10px;
-              padding: 32px;
-              margin-bottom: 48px;
+              background: transparent;
+              border: none;
+              border-radius: 0;
+              padding: 0;
+              margin-bottom: 32px;
             }
 
             section.main:has(#cfg-scope) .section-title{
@@ -20194,7 +21055,24 @@ def main():
               margin-bottom: 24px;
               color: #e6edf5;
             }
-
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stTextInput"]),
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stTextArea"]),
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stSelectbox"]),
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stNumberInput"]),
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stDateInput"]),
+            section.main:has(#cfg-scope) [data-testid="stElementContainer"]:has(> div[data-testid="stFileUploader"]){
+              width: 50% !important;
+              max-width: 50% !important;
+            }
+            section.main:has(#cfg-scope) div[data-testid="stTextInput"],
+            section.main:has(#cfg-scope) div[data-testid="stTextArea"],
+            section.main:has(#cfg-scope) div[data-testid="stSelectbox"],
+            section.main:has(#cfg-scope) div[data-testid="stNumberInput"],
+            section.main:has(#cfg-scope) div[data-testid="stDateInput"],
+            section.main:has(#cfg-scope) div[data-testid="stFileUploader"]{
+              width: 100% !important;
+              max-width: 100% !important;
+            }
 
             section.main:has(#cfg-scope) .form-group{
               margin-bottom: 20px;
@@ -20215,10 +21093,11 @@ def main():
             }
 
             section.main:has(#cfg-scope) .sub-block{
-              background: #132636;
-              border-radius: 8px;
-              padding: 20px;
-              margin-bottom: 20px;
+              background: transparent;
+              border: none;
+              border-radius: 0;
+              padding: 0;
+              margin-bottom: 16px;
             }
 
             section.main:has(#cfg-scope) .upload-zone{
@@ -20530,6 +21409,26 @@ def main():
 
         # Hub navigare configurare
         cfg_view = st.session_state.get("config_view", "")
+
+        def _cfg_half_col():
+            col_l, _col_r = st.columns([0.5, 0.5])
+            return col_l
+
+        def _cfg_text_input(*args, **kwargs):
+            with _cfg_half_col():
+                return st.text_input(*args, **kwargs)
+
+        def _cfg_selectbox(*args, **kwargs):
+            with _cfg_half_col():
+                return st.selectbox(*args, **kwargs)
+
+        def _cfg_file_uploader(*args, **kwargs):
+            with _cfg_half_col():
+                return st.file_uploader(*args, **kwargs)
+
+        def _cfg_checkbox(*args, **kwargs):
+            with _cfg_half_col():
+                return st.checkbox(*args, **kwargs)
         st.markdown('<div class="config-navigation">', unsafe_allow_html=True)
         nav_pontaj = st.button("🕒 Pontaj (modul separat)", key="cfg_nav_pontaj")
         nav_users = st.button("👥 Utilizatori (admin)", key="cfg_nav_users")
@@ -20546,7 +21445,6 @@ def main():
 
         # --- Pontaj (modul separat) – pagină dedicată în Configurare ---
         if cfg_view == "pontaj":
-            st.markdown('<div class="section-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-title">🕒 Pontaj (modul separat)</div>', unsafe_allow_html=True)
             cfg["pontaj_url"] = st.text_input(
                 "URL aplicație Pontaj (ex: http://SERVER:8502)",
@@ -20556,7 +21454,6 @@ def main():
             if st.button("Închide", key="cfg_close_pontaj"):
                 st.session_state["config_view"] = ""
                 st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
         # --- Administrare utilizatori (doar pentru admin) – pagină dedicată în Configurare ---
         is_admin = str(st.session_state.get("user_role", "user")) == "admin"
@@ -20691,74 +21588,67 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)  # end .admin-users
 
         # --- Date unitate / instituție ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Date unitate / instituție</div>', unsafe_allow_html=True)
 
-        denumire_unitate = st.text_input(
+        denumire_unitate = _cfg_text_input(
             "Denumire unitate",
             value=cfg.get("denumire_unitate", ""),
             key="cfg_denumire",
         )
-        cui = st.text_input(
+        cui = _cfg_text_input(
             "CUI / CIF",
             value=cfg.get("cui", ""),
             key="cfg_cui",
         )
-        adresa = st.text_input(
+        adresa = _cfg_text_input(
             "Adresă (stradă, număr, localitate, județ)",
             value=cfg.get("adresa", ""),
             key="cfg_adresa",
         )
-        cont_bancar = st.text_input(
+        cont_bancar = _cfg_text_input(
             "Cont bancar (IBAN)",
             value=cfg.get("cont_bancar", ""),
             key="cfg_cont_bancar",
         )
-        banca = st.text_input(
+        banca = _cfg_text_input(
             "Bancă",
             value=cfg.get("banca", ""),
             key="cfg_banca",
         )
 
-        telefon = st.text_input(
+        telefon = _cfg_text_input(
             "Telefon",
             value=cfg.get("telefon", ""),
             key="cfg_tel",
         )
-        fax = st.text_input(
+        fax = _cfg_text_input(
             "Fax",
             value=cfg.get("fax", ""),
             key="cfg_fax",
         )
-        email = st.text_input(
+        email = _cfg_text_input(
             "Email",
             value=cfg.get("email", ""),
             key="cfg_email",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # --- Antet ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Antet documente</div>', unsafe_allow_html=True)
-        st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
-        sigla_file = st.file_uploader(
+        sigla_file = _cfg_file_uploader(
             "Siglă unitate (PNG/JPG) – opțional (se va afișa în stânga antetului)",
             type=["png", "jpg", "jpeg"],
             key="cfg_sigla_upl",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
-        afiseaza_iban_in_antet = st.checkbox(
+        afiseaza_iban_in_antet = _cfg_checkbox(
             "Afișează IBAN în antet (opțional)",
             value=bool(cfg.get("afiseaza_iban_in_antet", False)),
             key="cfg_show_iban",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # --- Semnare documente + Semnături ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Semnare documente</div>', unsafe_allow_html=True)
 
-        semnare_metoda = st.selectbox(
+        semnare_metoda = _cfg_selectbox(
             "Metodă semnare",
             options=["Nesemnate", "Olograf (scan)", "Electronic (token)"],
             index={"Nesemnate": 0, "Olograf (scan)": 1, "Electronic (token)": 2}.get(cfg.get("semnare_metoda", "Nesemnate"), 0),
@@ -20767,12 +21657,12 @@ def main():
 
         st.markdown('<div class="sub-block">', unsafe_allow_html=True)
         st.markdown("**Conducător unitate**", unsafe_allow_html=True)
-        conducator_nume = st.text_input(
+        conducator_nume = _cfg_text_input(
             "Nume și prenume",
             value=cfg.get("conducator_nume", ""),
             key="cfg_conducator_nume",
         )
-        conducator_functie = st.text_input(
+        conducator_functie = _cfg_text_input(
             "Funcție",
             value=cfg.get("conducator_functie", ""),
             key="cfg_conducator_functie",
@@ -20781,50 +21671,43 @@ def main():
 
         st.markdown('<div class="sub-block">', unsafe_allow_html=True)
         st.markdown("**Responsabil HR**", unsafe_allow_html=True)
-        responsabil_hr_nume = st.text_input(
+        responsabil_hr_nume = _cfg_text_input(
             "Nume și prenume",
             value=cfg.get("responsabil_hr_nume", ""),
             key="cfg_responsabil_hr_nume",
         )
-        responsabil_hr_functie = st.text_input(
+        responsabil_hr_functie = _cfg_text_input(
             "Funcție",
             value=cfg.get("responsabil_hr_functie", ""),
             key="cfg_responsabil_hr_functie",
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
         # --- User aplicație ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">User aplicație</div>', unsafe_allow_html=True)
 
-        app_user = st.text_input(
+        app_user = _cfg_text_input(
             "Utilizator aplicație",
             value=cfg.get("app_user", ""),
             key="cfg_app_user",
         )
-        app_pass = st.text_input(
+        app_pass = _cfg_text_input(
             "Parolă aplicație",
             value=cfg.get("app_pass", ""),
             type="password",
             key="cfg_app_pass",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # --- Bază de date ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Bază de date</div>', unsafe_allow_html=True)
 
-        new_db_path = st.text_input(
+        new_db_path = _cfg_text_input(
             "Calea către baza de date (db_path)",
             value=db_path,
             key="cfg_db_path",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # --- Câmpuri suplimentare (custom) ---
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Câmpuri suplimentare</div>', unsafe_allow_html=True)
 
         custom_fields: Dict[str, str] = cfg.get("custom_fields", {})
@@ -20835,7 +21718,7 @@ def main():
         if custom_fields:
             st.markdown("#### Câmpuri existente")
             for k, v in custom_fields.items():
-                new_v = st.text_input(
+                new_v = _cfg_text_input(
                     k,
                     value=str(v),
                     key=f"cfg_custom_{k}",
@@ -20843,13 +21726,13 @@ def main():
                 custom_fields[k] = new_v
 
         st.markdown("#### Adaugă câmp nou")
-        new_custom_name = st.text_input(
+        new_custom_name = _cfg_text_input(
             "Nume câmp nou",
             value="",
             key="cfg_custom_new_name",
             help="Ex: 'Telefon instituție', 'Website', etc.",
         )
-        new_custom_value = st.text_input(
+        new_custom_value = _cfg_text_input(
             "Valoare câmp nou",
             value="",
             key="cfg_custom_new_value",
@@ -20865,12 +21748,10 @@ def main():
                     "La următoarea deschidere va apărea în lista de mai sus."
                 )
 
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # -------------------------------------------------------------
         # 📚 NOMENCLATOARE (COR + Legea 153) – Import din Excel/CSV
         # -------------------------------------------------------------
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">📚 Nomenclatoare (import din Excel/CSV)</div>', unsafe_allow_html=True)
 
         tab_cor, tab_153 = st.tabs(["🧩 COR", "📜 Legea 153"])
@@ -21133,7 +22014,6 @@ def main():
                 "La următoarea rulare se va folosi noua bază de date și noile date de unitate."
             )
 
-        st.markdown("</div>", unsafe_allow_html=True)  # end .section-card Nomenclatoare
         st.markdown("</div>", unsafe_allow_html=True)  # end .page-container
 
     # IMPORTANT: ca la login – după ce pagina este randată
